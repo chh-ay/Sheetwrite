@@ -1,10 +1,10 @@
 {
   "protocolVersion": 1,
-  "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
+  "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
   "metadata": {
-    "commit": "83d6745a98cea4eebf23a978072d89d0fffdeb06",
+    "commit": "66a0df7c6288a89dfb2c8d2226a2fe0b88b3d25e",
     "dirty": false,
-    "timestamp": "2026-07-27T15:34:48.766Z",
+    "timestamp": "2026-08-09T14:10:47.440Z",
     "bunVersion": "1.3.14",
     "nodeVersion": "24.3.0",
     "browserVersion": "149.0.7827.55",
@@ -26,12 +26,9 @@
     "measuredSamples": 3,
     "warmupSamples": 1,
     "minimumSampleDurationMs": 100,
-    "rounds": 3,
+    "rounds": 2,
     "orderSeed": 1371602926,
     "engineOrder": [
-      [
-        "sheetwrite"
-      ],
       [
         "sheetwrite"
       ],
@@ -57,16 +54,17 @@
         "success": true,
         "errorClass": null,
         "message": null
-      },
-      {
-        "round": 3,
-        "engine": "sheetwrite",
-        "rows": 100000,
-        "attempt": 1,
-        "success": true,
-        "errorClass": null,
-        "message": null
       }
+    ],
+    "windowTransferScenarioOrder": [
+      [
+        "window-transfer.scroll.baseline",
+        "window-transfer.scroll.reuse-decoded-view-upper-bound"
+      ],
+      [
+        "window-transfer.scroll.reuse-decoded-view-upper-bound",
+        "window-transfer.scroll.baseline"
+      ]
     ]
   },
   "config": {
@@ -80,42 +78,44 @@
       "formula-dense.paint",
       "text-heavy.long-scroll",
       "scroll-fractional.same-window",
-      "geometry-unresized.1m"
+      "geometry-unresized.1m",
+      "window-transfer.scroll.baseline",
+      "window-transfer.scroll.reuse-decoded-view-upper-bound"
     ]
   },
   "results": [
     {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
       "round": 1,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "formula-dense.paint",
       "group": "formulae",
       "status": "success",
-      "operationCount": 763,
+      "operationCount": 764,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 100.00000000186265,
-          "operationCount": 200,
-          "perOperationMs": 0.5000000000093132
+          "durationMs": 118.39999999757856,
+          "operationCount": 196,
+          "perOperationMs": 0.6040816326407069
         },
         {
           "index": 1,
-          "durationMs": 104.90000000223517,
-          "operationCount": 279,
-          "perOperationMs": 0.3759856630904487
+          "durationMs": 113.79999999888241,
+          "operationCount": 284,
+          "perOperationMs": 0.4007042253481775
         },
         {
           "index": 2,
-          "durationMs": 107.49999999813735,
+          "durationMs": 133.4000000031665,
           "operationCount": 284,
-          "perOperationMs": 0.3785211267540048
+          "perOperationMs": 0.46971830987030455
         }
       ],
-      "medianMs": 0.3785211267540048,
-      "p95Ms": 0.48785211268378237,
-      "madMs": 0.0025354636635561145,
+      "medianMs": 0.46971830987030455,
+      "p95Ms": 0.5906453003636667,
+      "madMs": 0.06901408452212704,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -167,9 +167,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 20080377,
-        "afterBytes": 25141664,
-        "deltaBytes": 5061287
+        "beforeBytes": 18114908,
+        "afterBytes": 20778717,
+        "deltaBytes": 2663809
       },
       "resources": {
         "compiledFormats": 0,
@@ -185,7 +185,7 @@
       }
     },
     {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
       "round": 1,
       "engine": "sheetwrite",
       "rows": 100000,
@@ -196,26 +196,26 @@
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 3969.7000000011176,
+          "durationMs": 4102.5,
           "operationCount": 1,
-          "perOperationMs": 3969.7000000011176
+          "perOperationMs": 4102.5
         },
         {
           "index": 1,
-          "durationMs": 4203.9000000003725,
+          "durationMs": 4484.799999999814,
           "operationCount": 1,
-          "perOperationMs": 4203.9000000003725
+          "perOperationMs": 4484.799999999814
         },
         {
           "index": 2,
-          "durationMs": 4022.5,
+          "durationMs": 4140.700000000186,
           "operationCount": 1,
-          "perOperationMs": 4022.5
+          "perOperationMs": 4140.700000000186
         }
       ],
-      "medianMs": 4022.5,
-      "p95Ms": 4185.760000000335,
-      "madMs": 52.79999999888241,
+      "medianMs": 4140.700000000186,
+      "p95Ms": 4450.389999999851,
+      "madMs": 38.200000000186265,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -267,9 +267,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 20250857,
-        "afterBytes": 48982401,
-        "deltaBytes": 28731544
+        "beforeBytes": 18665166,
+        "afterBytes": 53711204,
+        "deltaBytes": 35046038
       },
       "resources": {
         "compiledFormats": 0,
@@ -285,37 +285,733 @@
       }
     },
     {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
       "round": 1,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "scroll-fractional.same-window",
       "group": "view-scrolling",
       "status": "success",
-      "operationCount": 424,
+      "operationCount": 456,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 100.59999998472631,
-          "operationCount": 145,
-          "perOperationMs": 0.6937931033429401
+          "durationMs": 100.59999999962747,
+          "operationCount": 146,
+          "perOperationMs": 0.6890410958878594
         },
         {
           "index": 1,
-          "durationMs": 100.20000000484288,
-          "operationCount": 139,
-          "perOperationMs": 0.7208633093873589
+          "durationMs": 100.00000000279397,
+          "operationCount": 159,
+          "perOperationMs": 0.628930817627635
         },
         {
           "index": 2,
-          "durationMs": 100.59999999403954,
+          "durationMs": 100.3000000026077,
+          "operationCount": 151,
+          "perOperationMs": 0.664238410613296
+        }
+      ],
+      "medianMs": 0.664238410613296,
+      "p95Ms": 0.6865608273604031,
+      "madMs": 0.02480268527456342,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "scroll-fractional.same-window uses a fractional device-pixel delta",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "scroll-fractional.same-window keeps the logical row window",
+          "expected": "0",
+          "observed": "0",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 53745508,
+        "afterBytes": 32630778,
+        "deltaBytes": -21114730
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
+      "round": 1,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "geometry-unresized.1m",
+      "group": "geometry",
+      "status": "success",
+      "operationCount": 2464559,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 100.00000000651926,
+          "operationCount": 817443,
+          "perOperationMs": 0.00012233268864803937
+        },
+        {
+          "index": 1,
+          "durationMs": 100.00000000279397,
+          "operationCount": 789915,
+          "perOperationMs": 0.00012659589956235033
+        },
+        {
+          "index": 2,
+          "durationMs": 100.00000000279397,
+          "operationCount": 857201,
+          "perOperationMs": 0.00011665875331782623
+        }
+      ],
+      "medianMs": 0.00012233268864803937,
+      "p95Ms": 0.00012616957847091923,
+      "madMs": 0.000004263210914310956,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
+          "expected": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "observed": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 32894994,
+        "afterBytes": 36901626,
+        "deltaBytes": 4006632
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
+      "round": 1,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "window-transfer.scroll.baseline",
+      "group": "view-scrolling",
+      "dataValidity": "product-valid",
+      "status": "success",
+      "operationCount": 191,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 100.90000000782311,
+          "operationCount": 67,
+          "perOperationMs": 1.5059701493704942,
+          "windowTransfer": {
+            "logicalFrames": 67,
+            "windowReadRequests": 67,
+            "logicalWindowReads": 67,
+            "copiedBytes": 229944,
+            "outputAllocationEvents": 67,
+            "copiedBytesPerLogicalFrame": 3432,
+            "outputAllocationEventsPerLogicalFrame": 1,
+            "copiedBytesPerLogicalRead": 3432,
+            "outputAllocationEventsPerLogicalRead": 1
+          }
+        },
+        {
+          "index": 1,
+          "durationMs": 101.19999999832362,
+          "operationCount": 66,
+          "perOperationMs": 1.5333333333079335,
+          "windowTransfer": {
+            "logicalFrames": 66,
+            "windowReadRequests": 66,
+            "logicalWindowReads": 66,
+            "copiedBytes": 226512,
+            "outputAllocationEvents": 66,
+            "copiedBytesPerLogicalFrame": 3432,
+            "outputAllocationEventsPerLogicalFrame": 1,
+            "copiedBytesPerLogicalRead": 3432,
+            "outputAllocationEventsPerLogicalRead": 1
+          }
+        },
+        {
+          "index": 2,
+          "durationMs": 101.49999999813735,
+          "operationCount": 58,
+          "perOperationMs": 1.7499999999678855,
+          "windowTransfer": {
+            "logicalFrames": 58,
+            "windowReadRequests": 58,
+            "logicalWindowReads": 58,
+            "copiedBytes": 199056,
+            "outputAllocationEvents": 58,
+            "copiedBytesPerLogicalFrame": 3432,
+            "outputAllocationEventsPerLogicalFrame": 1,
+            "copiedBytesPerLogicalRead": 3432,
+            "outputAllocationEventsPerLogicalRead": 1
+          }
+        }
+      ],
+      "medianMs": 1.5333333333079335,
+      "p95Ms": 1.7283333333018902,
+      "madMs": 0.027363183937439306,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "window-transfer.scroll.baseline completes one coordinator paint",
+          "expected": "1",
+          "observed": "1",
+          "passed": true
+        },
+        {
+          "checkpoint": "window-transfer.scroll.baseline requests one visible window",
+          "expected": "1",
+          "observed": "1",
+          "passed": true
+        },
+        {
+          "checkpoint": "window-transfer.scroll.baseline accounts for a fresh decoded window",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 36908438,
+        "afterBytes": 28074620,
+        "deltaBytes": -8833818
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      },
+      "windowTransfer": {
+        "logicalFrames": 191,
+        "windowReadRequests": 191,
+        "logicalWindowReads": 191,
+        "copiedBytes": 655512,
+        "outputAllocationEvents": 191,
+        "copiedBytesPerLogicalFrame": 3432,
+        "outputAllocationEventsPerLogicalFrame": 1,
+        "copiedBytesPerLogicalRead": 3432,
+        "outputAllocationEventsPerLogicalRead": 1
+      }
+    },
+    {
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
+      "round": 1,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "window-transfer.scroll.reuse-decoded-view-upper-bound",
+      "group": "view-scrolling",
+      "dataValidity": "pixel-data-invalid",
+      "status": "success",
+      "operationCount": 454,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 100.19999999925494,
+          "operationCount": 154,
+          "perOperationMs": 0.6506493506445126,
+          "windowTransfer": {
+            "logicalFrames": 154,
+            "windowReadRequests": 154,
+            "logicalWindowReads": 0,
+            "copiedBytes": 0,
+            "outputAllocationEvents": 0,
+            "copiedBytesPerLogicalFrame": 0,
+            "outputAllocationEventsPerLogicalFrame": 0,
+            "copiedBytesPerLogicalRead": null,
+            "outputAllocationEventsPerLogicalRead": null
+          }
+        },
+        {
+          "index": 1,
+          "durationMs": 100.29999999608845,
+          "operationCount": 144,
+          "perOperationMs": 0.6965277777506143,
+          "windowTransfer": {
+            "logicalFrames": 144,
+            "windowReadRequests": 144,
+            "logicalWindowReads": 0,
+            "copiedBytes": 0,
+            "outputAllocationEvents": 0,
+            "copiedBytesPerLogicalFrame": 0,
+            "outputAllocationEventsPerLogicalFrame": 0,
+            "copiedBytesPerLogicalRead": null,
+            "outputAllocationEventsPerLogicalRead": null
+          }
+        },
+        {
+          "index": 2,
+          "durationMs": 100.60000000428408,
+          "operationCount": 156,
+          "perOperationMs": 0.644871794899257,
+          "windowTransfer": {
+            "logicalFrames": 156,
+            "windowReadRequests": 156,
+            "logicalWindowReads": 0,
+            "copiedBytes": 0,
+            "outputAllocationEvents": 0,
+            "copiedBytesPerLogicalFrame": 0,
+            "outputAllocationEventsPerLogicalFrame": 0,
+            "copiedBytesPerLogicalRead": null,
+            "outputAllocationEventsPerLogicalRead": null
+          }
+        }
+      ],
+      "medianMs": 0.6506493506445126,
+      "p95Ms": 0.6919399350400041,
+      "madMs": 0.005777555745255625,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "window-transfer.scroll.reuse-decoded-view-upper-bound completes one coordinator paint",
+          "expected": "1",
+          "observed": "1",
+          "passed": true
+        },
+        {
+          "checkpoint": "window-transfer.scroll.reuse-decoded-view-upper-bound requests one visible window",
+          "expected": "1",
+          "observed": "1",
+          "passed": true
+        },
+        {
+          "checkpoint": "window-transfer.scroll.reuse-decoded-view-upper-bound deliberately reuses pixel-data-invalid decoded data",
+          "expected": "{\"logicalWindowReads\":0,\"copiedBytes\":0,\"outputAllocationEvents\":0}",
+          "observed": "{\"logicalWindowReads\":0,\"copiedBytes\":0,\"outputAllocationEvents\":0}",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 28098628,
+        "afterBytes": 38370252,
+        "deltaBytes": 10271624
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      },
+      "windowTransfer": {
+        "logicalFrames": 454,
+        "windowReadRequests": 454,
+        "logicalWindowReads": 0,
+        "copiedBytes": 0,
+        "outputAllocationEvents": 0,
+        "copiedBytesPerLogicalFrame": 0,
+        "outputAllocationEventsPerLogicalFrame": 0,
+        "copiedBytesPerLogicalRead": null,
+        "outputAllocationEventsPerLogicalRead": null
+      }
+    },
+    {
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
+      "round": 2,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "formula-dense.paint",
+      "group": "formulae",
+      "status": "success",
+      "operationCount": 845,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 109.8999999994412,
+          "operationCount": 284,
+          "perOperationMs": 0.3869718309839479
+        },
+        {
+          "index": 1,
+          "durationMs": 123.60000000149012,
+          "operationCount": 284,
+          "perOperationMs": 0.4352112676108807
+        },
+        {
+          "index": 2,
+          "durationMs": 100.30000000167638,
+          "operationCount": 277,
+          "perOperationMs": 0.3620938628219364
+        }
+      ],
+      "medianMs": 0.3869718309839479,
+      "p95Ms": 0.4303873239481874,
+      "madMs": 0.024877968162011488,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "formula-dense.paint resolves first visible formula",
+          "expected": "3",
+          "observed": "3",
+          "passed": true
+        },
+        {
+          "checkpoint": "formula-dense.paint resolves last visible formula column",
+          "expected": "6",
+          "observed": "6",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 18111120,
+        "afterBytes": 24689909,
+        "deltaBytes": 6578789
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
+      "round": 2,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "text-heavy.long-scroll",
+      "group": "view-scrolling",
+      "status": "success",
+      "operationCount": 3,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 3966.7000000001863,
+          "operationCount": 1,
+          "perOperationMs": 3966.7000000001863
+        },
+        {
+          "index": 1,
+          "durationMs": 4361.399999999441,
+          "operationCount": 1,
+          "perOperationMs": 4361.399999999441
+        },
+        {
+          "index": 2,
+          "durationMs": 4311.299999999814,
+          "operationCount": 1,
+          "perOperationMs": 4311.299999999814
+        }
+      ],
+      "medianMs": 4311.299999999814,
+      "p95Ms": 4356.389999999478,
+      "madMs": 50.09999999962747,
+      "validation": [
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        },
+        {
+          "checkpoint": "text-heavy.long-scroll advances through multiple row windows",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "text-heavy.long-scroll retains unique long text",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "grid remains mounted and accessibility-labelled",
+          "expected": "true",
+          "observed": "true",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical row count",
+          "expected": "100000",
+          "observed": "100000",
+          "passed": true
+        },
+        {
+          "checkpoint": "canonical sentinel checksum",
+          "expected": "fnv1a32:e2d3498b",
+          "observed": "fnv1a32:e2d3498b",
+          "passed": true
+        }
+      ],
+      "memory": {
+        "beforeBytes": 18658674,
+        "afterBytes": 55829980,
+        "deltaBytes": 37171306
+      },
+      "resources": {
+        "compiledFormats": 0,
+        "numberFormatters": 0,
+        "dateTimeFormatters": 0,
+        "formatCacheEntries": 0,
+        "numberFormatterCacheEntries": 0,
+        "dateTimeFormatterCacheEntries": 0
+      },
+      "mergeResources": {
+        "indexConstructions": 0,
+        "candidatesExamined": 0
+      }
+    },
+    {
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
+      "round": 2,
+      "engine": "sheetwrite",
+      "rows": 100000,
+      "scenarioId": "scroll-fractional.same-window",
+      "group": "view-scrolling",
+      "status": "success",
+      "operationCount": 430,
+      "rawSamples": [
+        {
+          "index": 0,
+          "durationMs": 100.19999999459833,
           "operationCount": 140,
-          "perOperationMs": 0.7185714285288538
+          "perOperationMs": 0.7157142856757024
+        },
+        {
+          "index": 1,
+          "durationMs": 100.69999999646097,
+          "operationCount": 142,
+          "perOperationMs": 0.7091549295525421
+        },
+        {
+          "index": 2,
+          "durationMs": 100.1000000005588,
+          "operationCount": 148,
+          "perOperationMs": 0.676351351355127
         }
       ],
-      "medianMs": 0.7185714285288538,
-      "p95Ms": 0.7206341213015084,
-      "madMs": 0.0022918808585050687,
+      "medianMs": 0.7091549295525421,
+      "p95Ms": 0.7150583500633864,
+      "madMs": 0.006559356123160276,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -367,9 +1063,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 49016445,
-        "afterBytes": 34924577,
-        "deltaBytes": -14091868
+        "beforeBytes": 55864332,
+        "afterBytes": 32389674,
+        "deltaBytes": -23474658
       },
       "resources": {
         "compiledFormats": 0,
@@ -385,37 +1081,37 @@
       }
     },
     {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
-      "round": 1,
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
+      "round": 2,
       "engine": "sheetwrite",
       "rows": 100000,
       "scenarioId": "geometry-unresized.1m",
       "group": "geometry",
       "status": "success",
-      "operationCount": 2415151,
+      "operationCount": 2325951,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 100,
-          "operationCount": 843835,
-          "perOperationMs": 0.00011850658007785883
+          "durationMs": 100.00000000651926,
+          "operationCount": 805297,
+          "perOperationMs": 0.00012417778783047653
         },
         {
           "index": 1,
-          "durationMs": 100.00000000186265,
-          "operationCount": 801253,
-          "perOperationMs": 0.0001248045249151799
+          "durationMs": 100.09999998565763,
+          "operationCount": 888185,
+          "perOperationMs": 0.00011270174567872418
         },
         {
           "index": 2,
-          "durationMs": 100.00000002607703,
-          "operationCount": 770063,
-          "perOperationMs": 0.00012985950503540235
+          "durationMs": 100.00000001490116,
+          "operationCount": 632469,
+          "perOperationMs": 0.00015811051611209587
         }
       ],
-      "medianMs": 0.0001248045249151799,
-      "p95Ms": 0.0001293540070233801,
-      "madMs": 0.000005054980120222446,
+      "medianMs": 0.00012417778783047653,
+      "p95Ms": 0.00015471724328393392,
+      "madMs": 0.000011476042151752354,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -461,9 +1157,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 34934553,
-        "afterBytes": 45551173,
-        "deltaBytes": 10616620
+        "beforeBytes": 32399738,
+        "afterBytes": 57998650,
+        "deltaBytes": 25598912
       },
       "resources": {
         "compiledFormats": 0,
@@ -479,37 +1175,71 @@
       }
     },
     {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
       "round": 2,
       "engine": "sheetwrite",
       "rows": 100000,
-      "scenarioId": "formula-dense.paint",
-      "group": "formulae",
+      "scenarioId": "window-transfer.scroll.reuse-decoded-view-upper-bound",
+      "group": "view-scrolling",
+      "dataValidity": "pixel-data-invalid",
       "status": "success",
-      "operationCount": 852,
+      "operationCount": 413,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 108.70000000111759,
-          "operationCount": 284,
-          "perOperationMs": 0.3827464788771746
+          "durationMs": 100.40000000689179,
+          "operationCount": 140,
+          "perOperationMs": 0.7171428571920841,
+          "windowTransfer": {
+            "logicalFrames": 140,
+            "windowReadRequests": 140,
+            "logicalWindowReads": 0,
+            "copiedBytes": 0,
+            "outputAllocationEvents": 0,
+            "copiedBytesPerLogicalFrame": 0,
+            "outputAllocationEventsPerLogicalFrame": 0,
+            "copiedBytesPerLogicalRead": null,
+            "outputAllocationEventsPerLogicalRead": null
+          }
         },
         {
           "index": 1,
-          "durationMs": 119.40000000037253,
-          "operationCount": 284,
-          "perOperationMs": 0.42042253521257933
+          "durationMs": 100.0000000083819,
+          "operationCount": 141,
+          "perOperationMs": 0.7092198582154745,
+          "windowTransfer": {
+            "logicalFrames": 141,
+            "windowReadRequests": 141,
+            "logicalWindowReads": 0,
+            "copiedBytes": 0,
+            "outputAllocationEvents": 0,
+            "copiedBytesPerLogicalFrame": 0,
+            "outputAllocationEventsPerLogicalFrame": 0,
+            "copiedBytesPerLogicalRead": null,
+            "outputAllocationEventsPerLogicalRead": null
+          }
         },
         {
           "index": 2,
-          "durationMs": 112.70000000298023,
-          "operationCount": 284,
-          "perOperationMs": 0.39683098592598676
+          "durationMs": 100.3000000026077,
+          "operationCount": 132,
+          "perOperationMs": 0.7598484848682402,
+          "windowTransfer": {
+            "logicalFrames": 132,
+            "windowReadRequests": 132,
+            "logicalWindowReads": 0,
+            "copiedBytes": 0,
+            "outputAllocationEvents": 0,
+            "copiedBytesPerLogicalFrame": 0,
+            "outputAllocationEventsPerLogicalFrame": 0,
+            "copiedBytesPerLogicalRead": null,
+            "outputAllocationEventsPerLogicalRead": null
+          }
         }
       ],
-      "medianMs": 0.39683098592598676,
-      "p95Ms": 0.4180633802839201,
-      "madMs": 0.014084507048812145,
+      "medianMs": 0.7171428571920841,
+      "p95Ms": 0.7555779221006246,
+      "madMs": 0.007922998976609641,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -530,15 +1260,21 @@
           "passed": true
         },
         {
-          "checkpoint": "formula-dense.paint resolves first visible formula",
-          "expected": "3",
-          "observed": "3",
+          "checkpoint": "window-transfer.scroll.reuse-decoded-view-upper-bound completes one coordinator paint",
+          "expected": "1",
+          "observed": "1",
           "passed": true
         },
         {
-          "checkpoint": "formula-dense.paint resolves last visible formula column",
-          "expected": "6",
-          "observed": "6",
+          "checkpoint": "window-transfer.scroll.reuse-decoded-view-upper-bound requests one visible window",
+          "expected": "1",
+          "observed": "1",
+          "passed": true
+        },
+        {
+          "checkpoint": "window-transfer.scroll.reuse-decoded-view-upper-bound deliberately reuses pixel-data-invalid decoded data",
+          "expected": "{\"logicalWindowReads\":0,\"copiedBytes\":0,\"outputAllocationEvents\":0}",
+          "observed": "{\"logicalWindowReads\":0,\"copiedBytes\":0,\"outputAllocationEvents\":0}",
           "passed": true
         },
         {
@@ -561,9 +1297,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 19967689,
-        "afterBytes": 29439016,
-        "deltaBytes": 9471327
+        "beforeBytes": 58005274,
+        "afterBytes": 34190418,
+        "deltaBytes": -23814856
       },
       "resources": {
         "compiledFormats": 0,
@@ -576,40 +1312,85 @@
       "mergeResources": {
         "indexConstructions": 0,
         "candidatesExamined": 0
+      },
+      "windowTransfer": {
+        "logicalFrames": 413,
+        "windowReadRequests": 413,
+        "logicalWindowReads": 0,
+        "copiedBytes": 0,
+        "outputAllocationEvents": 0,
+        "copiedBytesPerLogicalFrame": 0,
+        "outputAllocationEventsPerLogicalFrame": 0,
+        "copiedBytesPerLogicalRead": null,
+        "outputAllocationEventsPerLogicalRead": null
       }
     },
     {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
+      "runId": "a42aaa37-341b-413f-95fd-b25c911d4a2f",
       "round": 2,
       "engine": "sheetwrite",
       "rows": 100000,
-      "scenarioId": "text-heavy.long-scroll",
+      "scenarioId": "window-transfer.scroll.baseline",
       "group": "view-scrolling",
+      "dataValidity": "product-valid",
       "status": "success",
-      "operationCount": 3,
+      "operationCount": 194,
       "rawSamples": [
         {
           "index": 0,
-          "durationMs": 3991.0999999996275,
-          "operationCount": 1,
-          "perOperationMs": 3991.0999999996275
+          "durationMs": 100.69999999832362,
+          "operationCount": 65,
+          "perOperationMs": 1.5492307692049787,
+          "windowTransfer": {
+            "logicalFrames": 65,
+            "windowReadRequests": 65,
+            "logicalWindowReads": 65,
+            "copiedBytes": 223080,
+            "outputAllocationEvents": 65,
+            "copiedBytesPerLogicalFrame": 3432,
+            "outputAllocationEventsPerLogicalFrame": 1,
+            "copiedBytesPerLogicalRead": 3432,
+            "outputAllocationEventsPerLogicalRead": 1
+          }
         },
         {
           "index": 1,
-          "durationMs": 3918.7999999988824,
-          "operationCount": 1,
-          "perOperationMs": 3918.7999999988824
+          "durationMs": 100.69999999646097,
+          "operationCount": 64,
+          "perOperationMs": 1.5734374999447027,
+          "windowTransfer": {
+            "logicalFrames": 64,
+            "windowReadRequests": 64,
+            "logicalWindowReads": 64,
+            "copiedBytes": 219648,
+            "outputAllocationEvents": 64,
+            "copiedBytesPerLogicalFrame": 3432,
+            "outputAllocationEventsPerLogicalFrame": 1,
+            "copiedBytesPerLogicalRead": 3432,
+            "outputAllocationEventsPerLogicalRead": 1
+          }
         },
         {
           "index": 2,
-          "durationMs": 3731.199999999255,
-          "operationCount": 1,
-          "perOperationMs": 3731.199999999255
+          "durationMs": 100.8000000026077,
+          "operationCount": 65,
+          "perOperationMs": 1.5507692308093493,
+          "windowTransfer": {
+            "logicalFrames": 65,
+            "windowReadRequests": 65,
+            "logicalWindowReads": 65,
+            "copiedBytes": 223080,
+            "outputAllocationEvents": 65,
+            "copiedBytesPerLogicalFrame": 3432,
+            "outputAllocationEventsPerLogicalFrame": 1,
+            "copiedBytesPerLogicalRead": 3432,
+            "outputAllocationEventsPerLogicalRead": 1
+          }
         }
       ],
-      "medianMs": 3918.7999999988824,
-      "p95Ms": 3983.869999999553,
-      "madMs": 72.30000000074506,
+      "medianMs": 1.5507692308093493,
+      "p95Ms": 1.5711706730311674,
+      "madMs": 0.0015384616043705446,
       "validation": [
         {
           "checkpoint": "grid remains mounted and accessibility-labelled",
@@ -630,13 +1411,19 @@
           "passed": true
         },
         {
-          "checkpoint": "text-heavy.long-scroll advances through multiple row windows",
-          "expected": "true",
-          "observed": "true",
+          "checkpoint": "window-transfer.scroll.baseline completes one coordinator paint",
+          "expected": "1",
+          "observed": "1",
           "passed": true
         },
         {
-          "checkpoint": "text-heavy.long-scroll retains unique long text",
+          "checkpoint": "window-transfer.scroll.baseline requests one visible window",
+          "expected": "1",
+          "observed": "1",
+          "passed": true
+        },
+        {
+          "checkpoint": "window-transfer.scroll.baseline accounts for a fresh decoded window",
           "expected": "true",
           "observed": "true",
           "passed": true
@@ -661,9 +1448,9 @@
         }
       ],
       "memory": {
-        "beforeBytes": 20260401,
-        "afterBytes": 52970561,
-        "deltaBytes": 32710160
+        "beforeBytes": 34212894,
+        "afterBytes": 28497072,
+        "deltaBytes": -5715822
       },
       "resources": {
         "compiledFormats": 0,
@@ -676,594 +1463,17 @@
       "mergeResources": {
         "indexConstructions": 0,
         "candidatesExamined": 0
-      }
-    },
-    {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
-      "round": 2,
-      "engine": "sheetwrite",
-      "rows": 100000,
-      "scenarioId": "scroll-fractional.same-window",
-      "group": "view-scrolling",
-      "status": "success",
-      "operationCount": 453,
-      "rawSamples": [
-        {
-          "index": 0,
-          "durationMs": 100.49999999627471,
-          "operationCount": 145,
-          "perOperationMs": 0.6931034482501705
-        },
-        {
-          "index": 1,
-          "durationMs": 100.79999999701977,
-          "operationCount": 150,
-          "perOperationMs": 0.6719999999801318
-        },
-        {
-          "index": 2,
-          "durationMs": 100.50000000558794,
-          "operationCount": 158,
-          "perOperationMs": 0.6360759494024553
-        }
-      ],
-      "medianMs": 0.6719999999801318,
-      "p95Ms": 0.6909931034231666,
-      "madMs": 0.021103448270038627,
-      "validation": [
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        },
-        {
-          "checkpoint": "scroll-fractional.same-window uses a fractional device-pixel delta",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "scroll-fractional.same-window keeps the logical row window",
-          "expected": "0",
-          "observed": "0",
-          "passed": true
-        },
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        }
-      ],
-      "memory": {
-        "beforeBytes": 53004617,
-        "afterBytes": 61620022,
-        "deltaBytes": 8615405
       },
-      "resources": {
-        "compiledFormats": 0,
-        "numberFormatters": 0,
-        "dateTimeFormatters": 0,
-        "formatCacheEntries": 0,
-        "numberFormatterCacheEntries": 0,
-        "dateTimeFormatterCacheEntries": 0
-      },
-      "mergeResources": {
-        "indexConstructions": 0,
-        "candidatesExamined": 0
-      }
-    },
-    {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
-      "round": 2,
-      "engine": "sheetwrite",
-      "rows": 100000,
-      "scenarioId": "geometry-unresized.1m",
-      "group": "geometry",
-      "status": "success",
-      "operationCount": 2463523,
-      "rawSamples": [
-        {
-          "index": 0,
-          "durationMs": 100.09999998286366,
-          "operationCount": 738813,
-          "perOperationMs": 0.00013548759968065488
-        },
-        {
-          "index": 1,
-          "durationMs": 100.00000000372529,
-          "operationCount": 896246,
-          "perOperationMs": 0.00011157650913223076
-        },
-        {
-          "index": 2,
-          "durationMs": 100.00000000186265,
-          "operationCount": 828464,
-          "perOperationMs": 0.0001207053052418242
-        }
-      ],
-      "medianMs": 0.0001207053052418242,
-      "p95Ms": 0.0001340093702367718,
-      "madMs": 0.000009128796109593435,
-      "validation": [
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        },
-        {
-          "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
-          "expected": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
-          "observed": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
-          "passed": true
-        },
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        }
-      ],
-      "memory": {
-        "beforeBytes": 61628694,
-        "afterBytes": 48585350,
-        "deltaBytes": -13043344
-      },
-      "resources": {
-        "compiledFormats": 0,
-        "numberFormatters": 0,
-        "dateTimeFormatters": 0,
-        "formatCacheEntries": 0,
-        "numberFormatterCacheEntries": 0,
-        "dateTimeFormatterCacheEntries": 0
-      },
-      "mergeResources": {
-        "indexConstructions": 0,
-        "candidatesExamined": 0
-      }
-    },
-    {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
-      "round": 3,
-      "engine": "sheetwrite",
-      "rows": 100000,
-      "scenarioId": "formula-dense.paint",
-      "group": "formulae",
-      "status": "success",
-      "operationCount": 731,
-      "rawSamples": [
-        {
-          "index": 0,
-          "durationMs": 106.29999999888241,
-          "operationCount": 284,
-          "perOperationMs": 0.37429577464395214
-        },
-        {
-          "index": 1,
-          "durationMs": 100,
-          "operationCount": 271,
-          "perOperationMs": 0.36900369003690037
-        },
-        {
-          "index": 2,
-          "durationMs": 100.00000000186265,
-          "operationCount": 176,
-          "perOperationMs": 0.5681818181924014
-        }
-      ],
-      "medianMs": 0.37429577464395214,
-      "p95Ms": 0.5487932138375565,
-      "madMs": 0.005292084607051772,
-      "validation": [
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        },
-        {
-          "checkpoint": "formula-dense.paint resolves first visible formula",
-          "expected": "3",
-          "observed": "3",
-          "passed": true
-        },
-        {
-          "checkpoint": "formula-dense.paint resolves last visible formula column",
-          "expected": "6",
-          "observed": "6",
-          "passed": true
-        },
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        }
-      ],
-      "memory": {
-        "beforeBytes": 20228497,
-        "afterBytes": 25818324,
-        "deltaBytes": 5589827
-      },
-      "resources": {
-        "compiledFormats": 0,
-        "numberFormatters": 0,
-        "dateTimeFormatters": 0,
-        "formatCacheEntries": 0,
-        "numberFormatterCacheEntries": 0,
-        "dateTimeFormatterCacheEntries": 0
-      },
-      "mergeResources": {
-        "indexConstructions": 0,
-        "candidatesExamined": 0
-      }
-    },
-    {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
-      "round": 3,
-      "engine": "sheetwrite",
-      "rows": 100000,
-      "scenarioId": "text-heavy.long-scroll",
-      "group": "view-scrolling",
-      "status": "success",
-      "operationCount": 3,
-      "rawSamples": [
-        {
-          "index": 0,
-          "durationMs": 3976.60000000149,
-          "operationCount": 1,
-          "perOperationMs": 3976.60000000149
-        },
-        {
-          "index": 1,
-          "durationMs": 4009.5,
-          "operationCount": 1,
-          "perOperationMs": 4009.5
-        },
-        {
-          "index": 2,
-          "durationMs": 4007.199999999255,
-          "operationCount": 1,
-          "perOperationMs": 4007.199999999255
-        }
-      ],
-      "medianMs": 4007.199999999255,
-      "p95Ms": 4009.2699999999254,
-      "madMs": 2.300000000745058,
-      "validation": [
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        },
-        {
-          "checkpoint": "text-heavy.long-scroll advances through multiple row windows",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "text-heavy.long-scroll retains unique long text",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        }
-      ],
-      "memory": {
-        "beforeBytes": 20258453,
-        "afterBytes": 57446141,
-        "deltaBytes": 37187688
-      },
-      "resources": {
-        "compiledFormats": 0,
-        "numberFormatters": 0,
-        "dateTimeFormatters": 0,
-        "formatCacheEntries": 0,
-        "numberFormatterCacheEntries": 0,
-        "dateTimeFormatterCacheEntries": 0
-      },
-      "mergeResources": {
-        "indexConstructions": 0,
-        "candidatesExamined": 0
-      }
-    },
-    {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
-      "round": 3,
-      "engine": "sheetwrite",
-      "rows": 100000,
-      "scenarioId": "scroll-fractional.same-window",
-      "group": "view-scrolling",
-      "status": "success",
-      "operationCount": 485,
-      "rawSamples": [
-        {
-          "index": 0,
-          "durationMs": 100.09999999962747,
-          "operationCount": 161,
-          "perOperationMs": 0.6217391304324688
-        },
-        {
-          "index": 1,
-          "durationMs": 100.40000000223517,
-          "operationCount": 167,
-          "perOperationMs": 0.6011976048038035
-        },
-        {
-          "index": 2,
-          "durationMs": 100.40000000596046,
-          "operationCount": 157,
-          "perOperationMs": 0.6394904458978373
-        }
-      ],
-      "medianMs": 0.6217391304324688,
-      "p95Ms": 0.6377153143513005,
-      "madMs": 0.017751315465368567,
-      "validation": [
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        },
-        {
-          "checkpoint": "scroll-fractional.same-window uses a fractional device-pixel delta",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "scroll-fractional.same-window keeps the logical row window",
-          "expected": "0",
-          "observed": "0",
-          "passed": true
-        },
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        }
-      ],
-      "memory": {
-        "beforeBytes": 57480193,
-        "afterBytes": 66643534,
-        "deltaBytes": 9163341
-      },
-      "resources": {
-        "compiledFormats": 0,
-        "numberFormatters": 0,
-        "dateTimeFormatters": 0,
-        "formatCacheEntries": 0,
-        "numberFormatterCacheEntries": 0,
-        "dateTimeFormatterCacheEntries": 0
-      },
-      "mergeResources": {
-        "indexConstructions": 0,
-        "candidatesExamined": 0
-      }
-    },
-    {
-      "runId": "9b53c653-199a-4c15-b545-72c34cad1de7",
-      "round": 3,
-      "engine": "sheetwrite",
-      "rows": 100000,
-      "scenarioId": "geometry-unresized.1m",
-      "group": "geometry",
-      "status": "success",
-      "operationCount": 2512673,
-      "rawSamples": [
-        {
-          "index": 0,
-          "durationMs": 100,
-          "operationCount": 861993,
-          "perOperationMs": 0.00011601022282083497
-        },
-        {
-          "index": 1,
-          "durationMs": 100.09999998286366,
-          "operationCount": 806832,
-          "perOperationMs": 0.00012406548077278004
-        },
-        {
-          "index": 2,
-          "durationMs": 100.09999997913837,
-          "operationCount": 843848,
-          "perOperationMs": 0.00011862325914043569
-        }
-      ],
-      "medianMs": 0.00011862325914043569,
-      "p95Ms": 0.00012352125860954561,
-      "madMs": 0.0000026130363196007254,
-      "validation": [
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        },
-        {
-          "checkpoint": "geometry-unresized.1m builds exact uniform geometry",
-          "expected": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
-          "observed": "{\"count\":1000000,\"backingStoreBytes\":0,\"totalHeight\":28000000,\"middleRow\":500000,\"middleTop\":14000000,\"lastRow\":999999,\"lastTop\":27999972}",
-          "passed": true
-        },
-        {
-          "checkpoint": "grid remains mounted and accessibility-labelled",
-          "expected": "true",
-          "observed": "true",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical row count",
-          "expected": "100000",
-          "observed": "100000",
-          "passed": true
-        },
-        {
-          "checkpoint": "canonical sentinel checksum",
-          "expected": "fnv1a32:e2d3498b",
-          "observed": "fnv1a32:e2d3498b",
-          "passed": true
-        }
-      ],
-      "memory": {
-        "beforeBytes": 66652194,
-        "afterBytes": 70127578,
-        "deltaBytes": 3475384
-      },
-      "resources": {
-        "compiledFormats": 0,
-        "numberFormatters": 0,
-        "dateTimeFormatters": 0,
-        "formatCacheEntries": 0,
-        "numberFormatterCacheEntries": 0,
-        "dateTimeFormatterCacheEntries": 0
-      },
-      "mergeResources": {
-        "indexConstructions": 0,
-        "candidatesExamined": 0
+      "windowTransfer": {
+        "logicalFrames": 194,
+        "windowReadRequests": 194,
+        "logicalWindowReads": 194,
+        "copiedBytes": 665808,
+        "outputAllocationEvents": 194,
+        "copiedBytesPerLogicalFrame": 3432,
+        "outputAllocationEventsPerLogicalFrame": 1,
+        "copiedBytesPerLogicalRead": 3432,
+        "outputAllocationEventsPerLogicalRead": 1
       }
     }
   ],
@@ -1273,28 +1483,28 @@
       "round=1;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
       "round=1;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
       "round=1;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll",
+      "round=1;engine=sheetwrite;rows=100000;scenario=window-transfer.scroll.baseline",
+      "round=1;engine=sheetwrite;rows=100000;scenario=window-transfer.scroll.reuse-decoded-view-upper-bound",
       "round=2;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
       "round=2;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
       "round=2;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
       "round=2;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll",
-      "round=3;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
-      "round=3;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
-      "round=3;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
-      "round=3;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll"
+      "round=2;engine=sheetwrite;rows=100000;scenario=window-transfer.scroll.baseline",
+      "round=2;engine=sheetwrite;rows=100000;scenario=window-transfer.scroll.reuse-decoded-view-upper-bound"
     ],
     "observedKeys": [
       "round=1;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
       "round=1;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
       "round=1;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
       "round=1;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll",
+      "round=1;engine=sheetwrite;rows=100000;scenario=window-transfer.scroll.baseline",
+      "round=1;engine=sheetwrite;rows=100000;scenario=window-transfer.scroll.reuse-decoded-view-upper-bound",
       "round=2;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
       "round=2;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
       "round=2;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
       "round=2;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll",
-      "round=3;engine=sheetwrite;rows=100000;scenario=formula-dense.paint",
-      "round=3;engine=sheetwrite;rows=100000;scenario=geometry-unresized.1m",
-      "round=3;engine=sheetwrite;rows=100000;scenario=scroll-fractional.same-window",
-      "round=3;engine=sheetwrite;rows=100000;scenario=text-heavy.long-scroll"
+      "round=2;engine=sheetwrite;rows=100000;scenario=window-transfer.scroll.baseline",
+      "round=2;engine=sheetwrite;rows=100000;scenario=window-transfer.scroll.reuse-decoded-view-upper-bound"
     ],
     "missingKeys": [],
     "duplicateKeys": [],
