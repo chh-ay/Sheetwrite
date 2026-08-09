@@ -104,6 +104,7 @@ describe("conditional formula formats", () => {
     ];
     const store = new SheetwriteStore(workbook);
     const mainView = store.getVisibleWindow("s1", { start: 0, end: 1 }, [1]);
+    expect(Reflect.get(mainView, "ffiOutputAllocationEvents")).toBe(1);
     const messages: unknown[] = [];
     const renderer = new WorkerRenderer();
     Reflect.set(renderer, "worker", {

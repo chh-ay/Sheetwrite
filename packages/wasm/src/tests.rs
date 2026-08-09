@@ -21,6 +21,106 @@ fn put_number(sheet: &mut SheetData, row: usize, col: usize, value: f64) {
     sheet.set_num(i, value);
 }
 
+struct DecodedWindow {
+    kinds: Vec<u8>,
+    numbers: Vec<f64>,
+    string_index: Vec<i32>,
+    string_ids: Vec<u32>,
+    style_index: Vec<u32>,
+    style_dict: Vec<u32>,
+    cond_matches: Vec<u32>,
+    strings: Vec<String>,
+}
+
+fn decode_window(mut view: WindowView) -> DecodedWindow {
+    let packed = view.take_packed();
+    assert!(packed.len() >= 40);
+    let word = |index: usize| {
+        u32::from_le_bytes(
+            packed[index * 4..index * 4 + 4]
+                .try_into()
+                .expect("complete packed header word"),
+        )
+    };
+    assert_eq!(word(0), 0x3157_4e53);
+    assert_eq!(word(1), 1);
+    assert_eq!(word(2), 40);
+    assert_eq!(word(3) as usize, packed.len());
+    let rows = word(4) as usize;
+    let cols = word(5) as usize;
+    let cells = word(6) as usize;
+    let styles = word(7) as usize;
+    let cond_matches = word(8) as usize;
+    let strings = word(9) as usize;
+    assert_eq!(rows.checked_mul(cols), Some(cells));
+    assert!(cond_matches == 0 || cond_matches == cells);
+
+    let kinds_start = 40;
+    let numbers_start = (kinds_start + cells + 7) & !7;
+    let string_ids_start = numbers_start + cells * 8;
+    let string_index_start = string_ids_start + cells * 4;
+    let style_index_start = string_index_start + cells * 4;
+    let style_dict_start = style_index_start + cells * 4;
+    let cond_matches_start = style_dict_start + styles * 4;
+    assert_eq!(cond_matches_start + cond_matches * 4, packed.len());
+
+    let decode_u32 = |start: usize, len: usize| {
+        (0..len)
+            .map(|index| {
+                u32::from_le_bytes(
+                    packed[start + index * 4..start + index * 4 + 4]
+                        .try_into()
+                        .expect("complete packed u32"),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let decoded_strings = view.take_strings();
+    assert_eq!(decoded_strings.len(), strings);
+    DecodedWindow {
+        kinds: packed[kinds_start..kinds_start + cells].to_vec(),
+        numbers: (0..cells)
+            .map(|index| {
+                f64::from_le_bytes(
+                    packed[numbers_start + index * 8..numbers_start + index * 8 + 8]
+                        .try_into()
+                        .expect("complete packed f64"),
+                )
+            })
+            .collect(),
+        string_ids: decode_u32(string_ids_start, cells),
+        string_index: decode_u32(string_index_start, cells)
+            .into_iter()
+            .map(|value| value as i32)
+            .collect(),
+        style_index: decode_u32(style_index_start, cells),
+        style_dict: decode_u32(style_dict_start, styles),
+        cond_matches: decode_u32(cond_matches_start, cond_matches),
+        strings: decoded_strings,
+    }
+}
+
+#[test]
+fn formula_error_with_entry_uses_the_supplied_entry_and_preserves_spill_precedence() {
+    let key = (0, 0);
+    let mut sheet = SheetData::new(1, 1);
+    sheet
+        .formulas
+        .insert(key, FormulaEntry::error("=stored", FormulaError::Value));
+    let supplied = FormulaEntry::error("=supplied", FormulaError::DivZero);
+
+    assert_eq!(
+        formula_error_with_entry(&sheet, key, Some(&supplied)),
+        Some(FormulaError::DivZero)
+    );
+
+    sheet.spill_errors.insert(key, FormulaError::Spill);
+    assert_eq!(
+        formula_error_with_entry(&sheet, key, Some(&supplied)),
+        Some(FormulaError::Spill)
+    );
+}
+
 #[test]
 fn sheet_insert_rows_moves_cells_and_shifts_formulas() {
     let mut sheet = SheetData::new(2, 3);
@@ -464,6 +564,12 @@ fn mixed_spill_errors_materialize_at_their_array_positions() {
     }
     assert_eq!(string(&store, sheet, 1, 3).as_deref(), Some("#N/A"));
 
+    let view = decode_window(store.get_window(sheet, 1, 2, &[2, 4, 6]));
+    assert_eq!(view.kinds, vec![KIND_STRING, KIND_STRING, KIND_STRING]);
+    for index in view.string_index {
+        assert_eq!(view.strings[index as usize], "#N/A");
+    }
+
     let snapshot = store
         .capture_range(sheet, 0, 2, 3, 1)
         .expect("mixed-error spill history should capture");
@@ -670,11 +776,12 @@ fn value_results_feed_dependencies_and_windows() {
     assert_eq!(store.get_cell(sheet, 0, 3).kind(), KIND_BOOL);
     assert_close(number(&store, sheet, 0, 3), 0.0);
 
-    let mut view = store.get_window(sheet, 0, 1, &[0, 1, 2, 3]);
-    let kinds = view.take_kinds();
-    let string_ids = view.take_string_ids();
-    let pooled = store.pool_strings(&string_ids);
-    assert_eq!(kinds, vec![KIND_STRING, KIND_NUMBER, KIND_BOOL, KIND_BOOL]);
+    let view = decode_window(store.get_window(sheet, 0, 1, &[0, 1, 2, 3]));
+    let pooled = store.pool_strings(&view.string_ids);
+    assert_eq!(
+        view.kinds,
+        vec![KIND_STRING, KIND_NUMBER, KIND_BOOL, KIND_BOOL]
+    );
     assert_eq!(pooled[0], "hello");
 
     store.set_formula(sheet, 0, 0, r#"="world""#, 3);
@@ -1436,26 +1543,31 @@ fn window_view_uses_error_strings_and_consuming_reads() {
     store.set_formula(sheet, 0, 1, "=1/0", 9);
     store.recompute(sheet);
 
-    let mut view = store.get_window(sheet, 0, 1, &[0, 1]);
+    let view = store.get_window(sheet, 0, 1, &[0, 1, u32::MAX]);
     assert_eq!(view.n_rows(), 1);
-    assert_eq!(view.n_cols(), 2);
+    assert_eq!(view.n_cols(), 3);
 
-    let kinds = view.take_kinds();
-    let numbers = view.take_numbers();
-    let string_index = view.take_string_index();
-    let string_ids = view.take_string_ids();
-    let style_index = view.take_style_index();
-    let style_dict = view.take_style_dict();
-    let strings = view.take_strings();
-    let pooled = store.pool_strings(&string_ids);
+    let view = decode_window(view);
+    let pooled = store.pool_strings(&view.string_ids);
 
-    assert_eq!(kinds, vec![KIND_STRING, KIND_STRING]);
-    assert_eq!(numbers, vec![0.0, 0.0]);
-    assert_eq!(style_index, vec![0, 1]);
-    assert_eq!(style_dict, vec![7, 9]);
+    assert_eq!(view.kinds, vec![KIND_STRING, KIND_STRING, KIND_EMPTY]);
+    assert_eq!(view.numbers, vec![0.0, 0.0, 0.0]);
+    assert_eq!(view.style_index, vec![0, 1, 0]);
+    assert_eq!(view.style_dict, vec![7, 9]);
     assert_eq!(pooled[0], "hello");
-    assert_eq!(strings[string_index[1] as usize], "#DIV/0!");
-    assert!(view.take_kinds().is_empty());
+    assert_eq!(view.strings[view.string_index[1] as usize], "#DIV/0!");
+
+    let mut consumed = store.get_window(sheet, 0, 1, &[0, 1]);
+    assert!(!consumed.take_packed().is_empty());
+    assert!(consumed.take_packed().is_empty());
+
+    store.sheets[sheet]
+        .spill_errors
+        .insert((0, 1), FormulaError::Spill);
+    let spill_view = decode_window(store.get_window(sheet, 0, 1, &[1]));
+    assert_eq!(spill_view.kinds, vec![KIND_STRING]);
+    let spill_index = spill_view.string_index[0];
+    assert_eq!(spill_view.strings[spill_index as usize], "#SPILL!");
 }
 
 #[test]
@@ -2061,12 +2173,11 @@ fn conditional_format_window_masks_cover_predicates_bounds_and_row_order() {
         &[0, 0, 0, 0, 0, 1],
     );
 
-    let mut contiguous = store.get_window(sheet, 0, 3, &[0, 1]);
-    assert_eq!(contiguous.take_cond_matches(), vec![4, 18, 9, 0, 1, 34]);
-    assert!(contiguous.take_cond_matches().is_empty());
+    let contiguous = decode_window(store.get_window(sheet, 0, 3, &[0, 1]));
+    assert_eq!(contiguous.cond_matches, vec![4, 18, 9, 0, 1, 34]);
 
-    let mut reordered = store.get_window_rows(sheet, &[2, 0, 1], &[1, 0]);
-    assert_eq!(reordered.take_cond_matches(), vec![34, 1, 18, 4, 0, 9]);
+    let reordered = decode_window(store.get_window_rows(sheet, &[2, 0, 1], &[1, 0]));
+    assert_eq!(reordered.cond_matches, vec![34, 1, 18, 4, 0, 9]);
 }
 
 #[test]
@@ -2086,13 +2197,13 @@ fn conditional_formula_rules_shift_relative_refs_stop_and_follow_dependency_edit
         &[2, 0],
     );
 
-    let mut initial = store.get_window(sheet, 0, 3, &[2]);
-    assert_eq!(initial.take_cond_matches(), vec![2, 1, 1]);
+    let initial = decode_window(store.get_window(sheet, 0, 3, &[2]));
+    assert_eq!(initial.cond_matches, vec![2, 1, 1]);
 
     store.set_number(sheet, 1, 0, 2.0, 0);
     store.recompute(sheet);
-    let mut changed_dependency = store.get_window(sheet, 0, 3, &[2]);
-    assert_eq!(changed_dependency.take_cond_matches(), vec![2, 2, 1]);
+    let changed_dependency = decode_window(store.get_window(sheet, 0, 3, &[2]));
+    assert_eq!(changed_dependency.cond_matches, vec![2, 2, 1]);
 }
 
 #[test]
@@ -2517,8 +2628,7 @@ fn columns_fully_loaded_tracks_disjoint_columns_holes_bounds_and_sparse_accounti
 #[test]
 fn columns_fully_loaded_reflects_clean_eviction_and_dirty_pinning() {
     let mut store = CellStore::new();
-    let sheet =
-        store.add_paged_sheet(2, 1_000_000, 4096, 110_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    let sheet = store.add_paged_sheet(2, 1_000_000, 4096, 110_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
 
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 0, &[1.0], 0);
@@ -2550,6 +2660,10 @@ fn paged_formulas_propagate_loading_until_dependencies_arrive() {
     store.set_formula(sheet, 0, 1, "=A5001+1", 0);
     store.recompute(sheet);
     assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("#LOADING!"));
+    let loading_view = decode_window(store.get_window(sheet, 0, 1, &[1]));
+    assert_eq!(loading_view.kinds, vec![KIND_STRING]);
+    let loading_index = loading_view.string_index[0];
+    assert_eq!(loading_view.strings[loading_index as usize], "#LOADING!");
 
     store.begin_page_load();
     store.set_column_numbers(sheet, 0, 5000, &[41.0], 0);
@@ -3101,8 +3215,20 @@ fn required_formula_regressions_cover_let_lookup_and_criteria_shape() {
     store.set_formula(sheet, 0, 2, "=SUM(LET(x,SEQUENCE(2),1),2)", 0);
     store.set_formula(sheet, 0, 4, "=XMATCH(2,A1:A3,0)", 0);
     store.set_formula(sheet, 0, 5, "=MAXIFS(A1:B1,A1:A2,\">0\")", 0);
-    store.set_formula(sheet, 1, 3, "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:A3),\">1\")", 0);
-    store.set_formula(sheet, 1, 4, "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:B2),\">1\")", 0);
+    store.set_formula(
+        sheet,
+        1,
+        3,
+        "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:A3),\">1\")",
+        0,
+    );
+    store.set_formula(
+        sheet,
+        1,
+        4,
+        "=MAXIFS(CHOOSE(1,B1:B3),CHOOSE(1,A1:B2),\">1\")",
+        0,
+    );
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 3), 5.0);
     assert_close(number(&store, sheet, 0, 2), 3.0);
@@ -3138,7 +3264,6 @@ fn let_metadata_tracks_only_reachable_reads_and_volatility() {
     assert_close(number(&store, sheet, 0, 0), 1.0);
     assert_close(number(&store, sheet, 0, 1), 1.0);
 }
-
 
 #[test]
 fn required_control_lookup_reference_and_aggregate_targets_execute_end_to_end() {
@@ -3281,14 +3406,7 @@ fn every_indexed_array_producer_reinstalls_spills_after_dependency_edits() {
         ("=CHOOSEROWS(A1:A3,2,3)", 1, 20.0, 1, 0, 3.0),
         ("=LET(x,A1:A3,x)", 0, 9.0, 2, 0, 3.0),
         ("=CHOOSE(1,A1:A3,SEQUENCE(3))", 0, 9.0, 2, 0, 3.0),
-        (
-            "=LET(x,CHOOSE(1,A1:A3,SEQUENCE(3)),x)",
-            0,
-            9.0,
-            2,
-            0,
-            3.0,
-        ),
+        ("=LET(x,CHOOSE(1,A1:A3,SEQUENCE(3)),x)", 0, 9.0, 2, 0, 3.0),
     ];
 
     for (source, edit_row, anchor, probe_row, probe_col, probe) in cases {
@@ -3306,7 +3424,13 @@ fn every_indexed_array_producer_reinstalls_spills_after_dependency_edits() {
         assert_close(number(&store, sheet, 0, 4), 0.0);
         store.set_formula(sheet, 0, 4, source, 0);
         store.recompute(sheet);
-        store.set_number(sheet, edit_row, 0, if edit_row == 0 { 9.0 } else { 20.0 }, 0);
+        store.set_number(
+            sheet,
+            edit_row,
+            0,
+            if edit_row == 0 { 9.0 } else { 20.0 },
+            0,
+        );
         store.recompute(sheet);
 
         assert_close(number(&store, sheet, 0, 4), anchor);

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  createWindowTransferMetrics,
   type FailedScenario,
   parseRenderArtifact,
   parseRenderArtifactJson,
@@ -11,7 +12,13 @@ import {
   type ScenarioResult,
   scenarioGroup,
   summarizeCompleteness,
+  summarizeWindowTransferComparisons,
+  WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
+  WINDOW_TRANSFER_ORDER_SEED,
+  WINDOW_TRANSFER_SCENARIO_IDS,
+  WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
 } from "../src/render-protocol.js";
+import { counterbalancedOrder } from "../src/stats.js";
 
 const RUN_ID = "00000000-0000-4000-8000-000000000051";
 const TIMESTAMP = "2026-07-14T12:00:00.000Z";
@@ -158,6 +165,109 @@ function completeArtifact(): RenderBenchmarkArtifact {
   return artifactWithResults(results);
 }
 
+function windowTransferArtifact(): RenderBenchmarkArtifact {
+  const config: RenderRunConfig = {
+    engines: ["sheetwrite"],
+    rows: [200],
+    scenarios: [...WINDOW_TRANSFER_SCENARIO_IDS],
+  };
+  const results: ScenarioResult[] = [];
+  for (let round = 1; round <= 2; round++) {
+    for (const scenarioId of WINDOW_TRANSFER_SCENARIO_IDS) {
+      const baseline = scenarioId === WINDOW_TRANSFER_BASELINE_SCENARIO_ID;
+      const perOperationMs = baseline ? (round === 1 ? 5 : 5.2) : round === 1 ? 3 : 3.1;
+      const sampleCounters = {
+        logicalFrames: 100,
+        windowReadRequests: 100,
+        logicalWindowReads: baseline ? 100 : 0,
+        copiedBytes: baseline ? 102_400 : 0,
+        outputAllocationEvents: baseline ? 700 : 0,
+      };
+      const rawSamples = [0, 1].map((index) => ({
+        index,
+        durationMs: perOperationMs * 100,
+        operationCount: 100,
+        perOperationMs,
+        windowTransfer: createWindowTransferMetrics(sampleCounters),
+      }));
+      results.push({
+        runId: RUN_ID,
+        round,
+        engine: "sheetwrite",
+        rows: 200,
+        scenarioId,
+        group: scenarioGroup(scenarioId),
+        dataValidity: baseline ? "product-valid" : "pixel-data-invalid",
+        status: "success",
+        operationCount: 200,
+        rawSamples,
+        medianMs: perOperationMs,
+        p95Ms: perOperationMs,
+        madMs: 0,
+        validation: [
+          {
+            checkpoint: "controlled window transfer",
+            expected: "accounted",
+            observed: "accounted",
+            passed: true,
+          },
+        ],
+        memory: { beforeBytes: null, afterBytes: null, deltaBytes: null },
+        windowTransfer: createWindowTransferMetrics({
+          logicalFrames: 200,
+          windowReadRequests: 200,
+          logicalWindowReads: baseline ? 200 : 0,
+          copiedBytes: baseline ? 204_800 : 0,
+          outputAllocationEvents: baseline ? 1_400 : 0,
+        }),
+      });
+    }
+  }
+  return {
+    protocolVersion: RENDER_PROTOCOL_VERSION,
+    runId: RUN_ID,
+    metadata: {
+      commit: "4ba3902",
+      dirty: false,
+      timestamp: TIMESTAMP,
+      bunVersion: "1.3.14",
+      nodeVersion: "24.3.0",
+      browserVersion: "Chromium 140",
+      os: "linux 6.0",
+      arch: "x64",
+      cpu: "test cpu",
+      engineVersions: { sheetwrite: "0.1.0", handsontable: "18.0.0" },
+      datasetSeed: 0x5eedc0de,
+      datasetHashes: { "200": "fnv1a32:12345678" },
+      viewport: { width: 640, height: 480 },
+      measuredSamples: 2,
+      warmupSamples: 1,
+      minimumSampleDurationMs: 100,
+      rounds: 2,
+      orderSeed: 0x51c0ffee,
+      engineOrder: [["sheetwrite"], ["sheetwrite"]],
+      launchAttempts: [1, 2].map((round) => ({
+        round,
+        engine: "sheetwrite" as const,
+        rows: 200,
+        attempt: 1,
+        success: true,
+        errorClass: null,
+        message: null,
+      })),
+      windowTransferScenarioOrder: counterbalancedOrder(
+        WINDOW_TRANSFER_SCENARIO_IDS,
+        2,
+        WINDOW_TRANSFER_ORDER_SEED,
+      ),
+    },
+    config,
+    results,
+    completeness: summarizeCompleteness(config, 2, results),
+    reproductionCommands: ["bun run --filter '@sheetwrite/bench' bench:render:diagnostic"],
+  };
+}
+
 describe("render artifact validation", () => {
   test("accepts a complete finite matrix", () => {
     const parsed = parseRenderArtifactJson(JSON.stringify(completeArtifact()), {
@@ -237,6 +347,40 @@ describe("render artifact validation", () => {
     expect(() => parseRenderArtifact(invalid)).toThrow("finite number");
     expect(() => parseRenderArtifactJson(JSON.stringify(invalid))).toThrow("finite number");
   });
+  test("fails closed on transfer counters, invalid labels, and order drift", () => {
+    const parsed = parseRenderArtifact(windowTransferArtifact());
+    const [comparison] = summarizeWindowTransferComparisons(parsed);
+    expect(comparison).toMatchObject({ rows: 200, resolved: true });
+    expect(comparison?.estimatedWindowTransferCostMs).toBeCloseTo(2.05);
+    expect(comparison?.maximumWithinVariantSpreadMs).toBeCloseTo(0.2);
+
+    const missingCounters = structuredClone(windowTransferArtifact());
+    const baseline = missingCounters.results.find(
+      (result) => result.scenarioId === WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
+    );
+    if (baseline?.status !== "success") throw new Error("missing baseline fixture");
+    Reflect.deleteProperty(baseline.rawSamples[0]!, "windowTransfer");
+    expect(() => parseRenderArtifact(missingCounters)).toThrow(
+      "rawSamples[0].windowTransfer is required",
+    );
+
+    const falselyValid = structuredClone(windowTransferArtifact());
+    const upperBound = falselyValid.results.find(
+      (result) => result.scenarioId === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
+    );
+    if (!upperBound) throw new Error("missing upper-bound fixture");
+    Reflect.set(upperBound, "dataValidity", "product-valid");
+    expect(() => parseRenderArtifact(falselyValid)).toThrow("must be pixel-data-invalid");
+
+    const wrongOrder = structuredClone(windowTransferArtifact());
+    const firstOrder = wrongOrder.metadata.windowTransferScenarioOrder?.[0];
+    if (!firstOrder) throw new Error("missing counterbalance fixture");
+    Reflect.set(wrongOrder.metadata, "windowTransferScenarioOrder", [
+      [...firstOrder].reverse(),
+      [...firstOrder].reverse(),
+    ]);
+    expect(() => parseRenderArtifact(wrongOrder)).toThrow("required counterbalance");
+  });
 });
 
 describe("derived Markdown evidence", () => {
@@ -249,5 +393,12 @@ describe("derived Markdown evidence", () => {
     expect(markdown).toContain("**FAILED (validate)**");
     expect(markdown).toContain("(./render-results.json)");
     expect(markdown).toContain("Comparative headline ratios are intentionally omitted");
+  });
+  test("labels the stale-view comparison and reports exact per-frame/read counters", () => {
+    const markdown = renderBenchmarkMarkdown(windowTransferArtifact());
+    expect(markdown).toContain("pixels/data are invalid");
+    expect(markdown).toContain("copied/frame");
+    expect(markdown).toContain("allocations/read");
+    expect(markdown).toContain("maximum within-variant spread");
   });
 });
