@@ -47,9 +47,23 @@ export class RenderCoordinator {
   private windowedColumnIndices: readonly number[] = [];
   private datasourceColumnIndices: readonly number[] = [];
   private datasourceFrozenColumns = -1;
-  private columnWindowSignature = "";
-  private lastDataSignature = "";
-  private lastPaintSignature = "";
+  private columnWindowRevision = 0;
+  private lastDataSheet: SheetId | null = null;
+  private lastDataRowStart = 0;
+  private lastDataRowEnd = 0;
+  private lastDataColumnWindowRevision = 0;
+  private lastDataStoreEpoch = 0;
+  private lastDataInvalidationEpoch = 0;
+  private lastDataFrozenRows = 0;
+  private lastDataFrozenColumns = 0;
+  private lastPaintContentTop = 0;
+  private lastPaintScrollLeft = 0;
+  private lastPaintClientWidth = 0;
+  private lastPaintClientHeight = 0;
+  private lastPaintInvalidationEpoch = 0;
+  private lastPaintFrozenHeight = 0;
+  private lastPaintFrozenWidth = 0;
+  private lastPaintZoom = 0;
   private lastPaintView: VisibleWindowView | null = null;
   private cachedPaneViews: VisibleWindowView[] = [];
   private readonly paneValuePools: CellScalar[][] = [];
@@ -57,7 +71,7 @@ export class RenderCoordinator {
   private readonly domMergeAnchorValuePools: CellScalar[][] = [];
   private readonly domMergeSourceViews: VisibleWindowView[] = [];
   private mainViewValuePool: CellScalar[] = [];
-  private domMergeAnchorSignature = "";
+  private readonly domMergeAnchorState: Array<SheetId | number> = [];
   private destroyed = false;
 
   constructor(private readonly options: RenderCoordinatorOptions) {}
@@ -82,7 +96,6 @@ export class RenderCoordinator {
     this.columnWindowEnd = -1;
     this.datasourceColumnIndices = [];
     this.datasourceFrozenColumns = -1;
-    this.columnWindowSignature = "";
     this.invalidateData();
   }
 
@@ -117,9 +130,7 @@ export class RenderCoordinator {
     this.cachedPaneViews = [];
     this.cachedDomMergeAnchorViews = [];
     this.domMergeSourceViews.length = 0;
-    this.lastDataSignature = "";
-    this.lastPaintSignature = "";
-    this.domMergeAnchorSignature = "";
+    this.domMergeAnchorState.length = 0;
   }
 
   private render(): void {
@@ -172,10 +183,17 @@ export class RenderCoordinator {
     const columnWindowChanged =
       columns.start !== this.columnWindowStart || columns.end !== this.columnWindowEnd;
     if (columnWindowChanged) {
+      const columnCount = columns.end - columns.start;
+      let contentsChanged = columnCount !== this.windowedColumnIndices.length;
+      for (let offset = 0; !contentsChanged && offset < columnCount; offset++) {
+        if (geometry.columnIndices[columns.start + offset] !== this.windowedColumnIndices[offset]) {
+          contentsChanged = true;
+        }
+      }
       this.columnWindowStart = columns.start;
       this.columnWindowEnd = columns.end;
       this.windowedColumnIndices = geometry.columnIndices.slice(columns.start, columns.end);
-      this.columnWindowSignature = this.windowedColumnIndices.join(",");
+      if (contentsChanged) this.columnWindowRevision += 1;
       this.options.ariaMirror.bumpVersion();
     }
     if (columnWindowChanged || frozenColumns !== this.datasourceFrozenColumns) {
@@ -209,6 +227,7 @@ export class RenderCoordinator {
       this.datasourceColumnIndices,
     );
 
+    const activeSheet = this.options.activeSheet();
     const storeEpoch = this.options.storeEpoch();
     const viewport: Viewport = {
       scrollTop: contentTop,
@@ -223,18 +242,32 @@ export class RenderCoordinator {
     }
     this.options.renderer().setViewport(viewport);
 
-    const dataSignature =
-      `${this.options.activeSheet()}|${rows.start}|${rows.end}|${this.columnWindowSignature}` +
-      `|${storeEpoch}|${this.dataInvalidationEpoch}|${frozenRows}|${frozenColumns}`;
-    const paintSignature =
-      `${dataSignature}|${contentTop}|${scrollLeft}|${clientWidth}|${clientHeight}` +
-      `|${this.paintInvalidationEpoch}|${frozenHeight}|${frozenWidth}|${this.options.zoom()}`;
-    const refreshData = this.lastPaintView === null || dataSignature !== this.lastDataSignature;
-    const repaint = refreshData || paintSignature !== this.lastPaintSignature;
+    const zoom = this.options.zoom();
+    const refreshData =
+      this.lastPaintView === null ||
+      activeSheet !== this.lastDataSheet ||
+      rows.start !== this.lastDataRowStart ||
+      rows.end !== this.lastDataRowEnd ||
+      this.columnWindowRevision !== this.lastDataColumnWindowRevision ||
+      storeEpoch !== this.lastDataStoreEpoch ||
+      this.dataInvalidationEpoch !== this.lastDataInvalidationEpoch ||
+      frozenRows !== this.lastDataFrozenRows ||
+      frozenColumns !== this.lastDataFrozenColumns;
+    const repaint =
+      refreshData ||
+      !Object.is(contentTop, this.lastPaintContentTop) ||
+      !Object.is(scrollLeft, this.lastPaintScrollLeft) ||
+      !Object.is(clientWidth, this.lastPaintClientWidth) ||
+      !Object.is(clientHeight, this.lastPaintClientHeight) ||
+      this.paintInvalidationEpoch !== this.lastPaintInvalidationEpoch ||
+      !Object.is(frozenHeight, this.lastPaintFrozenHeight) ||
+      !Object.is(frozenWidth, this.lastPaintFrozenWidth) ||
+      !Object.is(zoom, this.lastPaintZoom);
 
     let view: VisibleWindowView;
     if (usePanes) {
       view = this.paintFrozenPanes(
+        activeSheet,
         rows,
         this.windowedColumnIndices,
         frozenRows,
@@ -253,7 +286,7 @@ export class RenderCoordinator {
       if (refreshData) {
         this.cachedPaneViews = [];
         this.lastPaintView = this.options.store.getVisibleWindow(
-          this.options.activeSheet(),
+          activeSheet,
           rows,
           this.windowedColumnIndices,
         );
@@ -275,8 +308,22 @@ export class RenderCoordinator {
       }
     }
     this.lastPaintView = view;
-    this.lastDataSignature = dataSignature;
-    this.lastPaintSignature = paintSignature;
+    this.lastDataSheet = activeSheet;
+    this.lastDataRowStart = rows.start;
+    this.lastDataRowEnd = rows.end;
+    this.lastDataColumnWindowRevision = this.columnWindowRevision;
+    this.lastDataStoreEpoch = storeEpoch;
+    this.lastDataInvalidationEpoch = this.dataInvalidationEpoch;
+    this.lastDataFrozenRows = frozenRows;
+    this.lastDataFrozenColumns = frozenColumns;
+    this.lastPaintContentTop = contentTop;
+    this.lastPaintScrollLeft = scrollLeft;
+    this.lastPaintClientWidth = clientWidth;
+    this.lastPaintClientHeight = clientHeight;
+    this.lastPaintInvalidationEpoch = this.paintInvalidationEpoch;
+    this.lastPaintFrozenHeight = frozenHeight;
+    this.lastPaintFrozenWidth = frozenWidth;
+    this.lastPaintZoom = zoom;
     this.options.ariaMirror.update(view);
     this.options.overlayPainter.paint(contentTop, scrollLeft, clientWidth, clientHeight);
     this.options.repositionEditor(contentTop, scrollLeft);
@@ -291,6 +338,7 @@ export class RenderCoordinator {
   }
 
   private paintFrozenPanes(
+    activeSheet: SheetId,
     bodyRows: { start: number; end: number },
     bodyColumns: readonly number[],
     frozenRows: number,
@@ -324,7 +372,7 @@ export class RenderCoordinator {
       let view = this.cachedPaneViews[slot];
       if (refreshData || !view) {
         view = this.retainPaneView(
-          this.options.store.getVisibleWindow(this.options.activeSheet(), rows, columns),
+          this.options.store.getVisibleWindow(activeSheet, rows, columns),
           slot,
         );
         this.cachedPaneViews[slot] = view;
@@ -400,14 +448,23 @@ export class RenderCoordinator {
     requests: readonly DomMergeAnchorRequest[],
     refreshData: boolean,
   ): boolean {
-    let signature = String(requests.length);
+    let changed = refreshData;
+    let stateIndex = 0;
     for (const request of requests) {
-      signature += `|${request.sheet}\u0000${request.row}`;
-      for (const col of request.cols) signature += `,${col}`;
+      if (this.domMergeAnchorState[stateIndex] !== request.sheet) changed = true;
+      this.domMergeAnchorState[stateIndex++] = request.sheet;
+      if (this.domMergeAnchorState[stateIndex] !== request.row) changed = true;
+      this.domMergeAnchorState[stateIndex++] = request.row;
+      if (this.domMergeAnchorState[stateIndex] !== request.cols.length) changed = true;
+      this.domMergeAnchorState[stateIndex++] = request.cols.length;
+      for (const col of request.cols) {
+        if (this.domMergeAnchorState[stateIndex] !== col) changed = true;
+        this.domMergeAnchorState[stateIndex++] = col;
+      }
     }
-    const refresh = refreshData || signature !== this.domMergeAnchorSignature;
-    this.domMergeAnchorSignature = signature;
-    return refresh;
+    if (this.domMergeAnchorState.length !== stateIndex) changed = true;
+    this.domMergeAnchorState.length = stateIndex;
+    return changed;
   }
 
   private loadDomMergeAnchorViews(requests: readonly DomMergeAnchorRequest[]): void {
