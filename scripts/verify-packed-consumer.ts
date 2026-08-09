@@ -209,6 +209,31 @@ function rewriteWorkspaceRanges(
   );
 }
 
+async function copyManifestEntry(
+  sourceRoot: string,
+  packageRoot: string,
+  entry: string,
+): Promise<void> {
+  if (!/[*?[\]{}]/u.test(entry)) {
+    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
+    return;
+  }
+  const matches = Array.from(
+    new Bun.Glob(entry).scanSync({
+      cwd: sourceRoot,
+      dot: true,
+      onlyFiles: true,
+      followSymlinks: false,
+    }),
+  );
+  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
+  for (const path of matches) {
+    const target = join(packageRoot, path);
+    await mkdir(dirname(target), { recursive: true });
+    await cp(join(sourceRoot, path), target);
+  }
+}
+
 async function stagePackage(
   spec: PackageSpec,
   stageRoot: string,
@@ -220,7 +245,7 @@ async function stagePackage(
   await mkdir(packageRoot, { recursive: true });
 
   for (const path of [...(manifest.files ?? []), "LICENSE", "README.md"]) {
-    await cp(join(sourceRoot, path), join(packageRoot, path), { recursive: true });
+    await copyManifestEntry(sourceRoot, packageRoot, path);
   }
 
   const stagedManifest: PackageManifest = {

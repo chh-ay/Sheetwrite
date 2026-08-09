@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
   BUN_VERSION,
@@ -584,6 +584,31 @@ interface StagedPackage {
   readonly internalDependencies: Readonly<Record<string, string>>;
 }
 
+async function copyManifestEntry(
+  sourceRoot: string,
+  packageRoot: string,
+  entry: string,
+): Promise<void> {
+  if (!/[*?[\]{}]/u.test(entry)) {
+    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
+    return;
+  }
+  const matches = Array.from(
+    new Bun.Glob(entry).scanSync({
+      cwd: sourceRoot,
+      dot: true,
+      onlyFiles: true,
+      followSymlinks: false,
+    }),
+  );
+  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
+  for (const path of matches) {
+    const target = join(packageRoot, path);
+    await mkdir(dirname(target), { recursive: true });
+    await cp(join(sourceRoot, path), target);
+  }
+}
+
 async function stagePackage(
   source: { readonly directory: string; readonly manifest: PackageManifest },
   stageRoot: string,
@@ -593,7 +618,7 @@ async function stagePackage(
   await mkdir(target, { recursive: true });
   const paths = new Set([...(source.manifest.files ?? []), "LICENSE", "README.md"]);
   for (const path of paths) {
-    await cp(join(source.directory, path), join(target, path), { recursive: true });
+    await copyManifestEntry(source.directory, target, path);
   }
   const scripts = { ...source.manifest.scripts };
   delete scripts.prepublishOnly;
