@@ -423,6 +423,15 @@ function packageTargets(manifest: PackageManifest): string[] {
   return [...targets];
 }
 
+function manifestEntryExists(entry: string, files: readonly string[]): boolean {
+  const path = entry.replace(/^\.\//, "").replace(/\/$/, "");
+  if (/[*?[\]{}]/u.test(path)) {
+    const glob = new Bun.Glob(path);
+    return files.some((file) => glob.match(file));
+  }
+  return files.includes(path) || files.some((file) => file.startsWith(`${path}/`));
+}
+
 function validatePackedManifest(
   artifact: ReleasePackageArtifact,
   manifest: PackageManifest,
@@ -460,8 +469,7 @@ function validatePackedManifest(
     }
   }
   for (const declared of manifest.files ?? []) {
-    const path = declared.replace(/^\.\//, "").replace(/\/$/, "");
-    if (!files.has(path) && !artifact.files.some((file) => file.startsWith(`${path}/`))) {
+    if (!manifestEntryExists(declared, artifact.files)) {
       throw new Error(
         `${artifact.name} declared file target does not exist with exact case: ${declared}`,
       );
