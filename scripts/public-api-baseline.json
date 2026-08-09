@@ -420,10 +420,7 @@
     {
       "package": "@sheetwrite/core",
       "entryPoint": "./worker",
-      "exports": [
-        "WorkerAcknowledgement",
-        "createWorkerMessageHandler"
-      ]
+      "exports": ["WorkerAcknowledgement", "createWorkerMessageHandler"]
     },
     {
       "package": "@sheetwrite/react",
@@ -537,9 +534,7 @@
     {
       "package": "@sheetwrite/xlsx",
       "entryPoint": "./register",
-      "exports": [
-        "registerXlsxBackends"
-      ]
+      "exports": ["registerXlsxBackends"]
     }
   ]
 }
