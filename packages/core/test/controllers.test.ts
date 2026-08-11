@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "bun:test";
 import type { AriaMirror } from "../src/aria-mirror.js";
 import { DatasourceController } from "../src/datasource-controller.js";
 import { DocumentController } from "../src/document-controller.js";
-import type { DomOverlay } from "../src/dom-overlay.js";
+import type { DomMergeAnchorRequest, DomOverlay } from "../src/dom-overlay.js";
 import { GeometryLayoutController } from "../src/geometry-layout-controller.js";
 import { DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import type { OverlayPainter } from "../src/overlay-painter.js";
@@ -237,6 +237,8 @@ describe("RenderCoordinator", () => {
     let scrollTop = 0;
     let scrollLeft = 0;
     let storeEpoch = 0;
+    let zoom = 1;
+    let anchorRequests: readonly DomMergeAnchorRequest[] = [];
     const countedStore = {
       getVisibleWindow: (...args: Parameters<Store["getVisibleWindow"]>) => {
         windowReads += 1;
@@ -250,7 +252,7 @@ describe("RenderCoordinator", () => {
         activeSheet: () => "s1",
         loadable: null,
         theme: () => DEFAULT_THEME,
-        zoom: () => 1,
+        zoom: () => zoom,
         maxElementHeight: () => 33_000_000,
       },
       180,
@@ -272,6 +274,7 @@ describe("RenderCoordinator", () => {
     const viewports: Viewport[] = [];
     const paints: VisibleWindowView[] = [];
     let overlayPaints = 0;
+    const domAnchorViewCounts: number[] = [];
     let ariaUpdates = 0;
     const renderer: Renderer = {
       mount: () => {},
@@ -288,8 +291,14 @@ describe("RenderCoordinator", () => {
       },
     } as unknown as OverlayPainter;
     const domOverlay = {
-      mergeAnchorRequests: () => [],
-      paint: () => {},
+      mergeAnchorRequests: () => anchorRequests,
+      paint: (
+        _view: VisibleWindowView,
+        _viewport: Viewport,
+        anchorViews: readonly VisibleWindowView[],
+      ) => {
+        domAnchorViewCounts.push(anchorViews.length);
+      },
       paintPanes: () => {},
     } as unknown as DomOverlay;
     const aria = {
@@ -318,7 +327,7 @@ describe("RenderCoordinator", () => {
       activeSheet: () => "s1",
       theme: () => DEFAULT_THEME,
       overscan: () => 0,
-      zoom: () => 1,
+      zoom: () => zoom,
       storeEpoch: () => storeEpoch,
       viewportHeight: () => 180,
       viewportWidth: () => 420,
@@ -338,11 +347,14 @@ describe("RenderCoordinator", () => {
       expect(overlayPaints).toBe(1);
       expect(ariaUpdates).toBe(1);
       expect(windowReads).toBe(1);
+      coordinator.renderNow();
+      expect(paints).toHaveLength(1);
+      expect(windowReads).toBe(1);
 
       coordinator.invalidate();
       coordinator.renderNow();
       expect(paints).toHaveLength(2);
-      expect(viewports[1]?.contentRevision).toBe(1);
+      expect(viewports.at(-1)?.contentRevision).toBe(1);
       expect(windowReads).toBe(1);
 
       scrollTop = 1;
@@ -356,13 +368,54 @@ describe("RenderCoordinator", () => {
       coordinator.renderNow();
       expect(windowReads).toBe(2);
 
-      storeEpoch += 1;
+      scrollLeft = 170;
       coordinator.renderNow();
       expect(windowReads).toBe(3);
 
-      coordinator.invalidateData();
+      storeEpoch += 1;
       coordinator.renderNow();
       expect(windowReads).toBe(4);
+
+      coordinator.invalidateData();
+      coordinator.renderNow();
+      expect(windowReads).toBe(5);
+
+      const paintsBeforeZoom = paints.length;
+      zoom = 1.25;
+      coordinator.renderNow();
+      expect(windowReads).toBe(5);
+      expect(paints).toHaveLength(paintsBeforeZoom + 1);
+
+      anchorRequests = [{ sheet: "s1", row: 0, cols: [0] }];
+      coordinator.invalidate();
+      coordinator.renderNow();
+      expect(windowReads).toBe(6);
+      expect(domAnchorViewCounts.at(-1)).toBe(1);
+
+      coordinator.invalidate();
+      coordinator.renderNow();
+      expect(windowReads).toBe(6);
+
+      anchorRequests = [{ sheet: "s1", row: 1, cols: [0] }];
+      coordinator.invalidate();
+      coordinator.renderNow();
+      expect(windowReads).toBe(7);
+
+      anchorRequests = [{ sheet: "s1", row: 1, cols: [1] }];
+      coordinator.invalidate();
+      coordinator.renderNow();
+      expect(windowReads).toBe(8);
+
+      anchorRequests = [{ sheet: "s1", row: 1, cols: [1, 2] }];
+      coordinator.invalidate();
+      coordinator.renderNow();
+      expect(windowReads).toBe(9);
+
+      anchorRequests = [];
+      coordinator.invalidate();
+      coordinator.renderNow();
+      expect(windowReads).toBe(9);
+      expect(domAnchorViewCounts.at(-1)).toBe(0);
 
       const paintsBeforeDestroy = paints.length;
       coordinator.destroy();

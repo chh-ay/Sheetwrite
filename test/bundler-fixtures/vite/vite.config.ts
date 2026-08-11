@@ -5,7 +5,9 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [svelte()],
   build: {
+    sourcemap: "hidden",
     manifest: true,
+    minify: "esbuild",
     rollupOptions: {
       input: {
         core: resolve(import.meta.dirname, "index.html"),

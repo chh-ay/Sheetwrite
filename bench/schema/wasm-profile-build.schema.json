@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sheetwrite.dev/schemas/wasm-profile-build-v1.json",
+  "title": "Sheetwrite fixed-Rust WASM post-link build capture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "protocol",
+    "provenance",
+    "rustProfile",
+    "postLink",
+    "variants",
+    "completion"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "protocol": { "const": "wasm-post-link-build-capture-v1" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "dirty",
+        "timestamp",
+        "host",
+        "rustc",
+        "cargo",
+        "wasmPack",
+        "wasmOptVersion",
+        "wasmOptSha256",
+        "bun"
+      ],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "dirty": { "const": false },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "host": { "type": "string", "minLength": 1 },
+        "rustc": { "type": "string", "minLength": 1 },
+        "cargo": { "type": "string", "minLength": 1 },
+        "wasmPack": { "type": "string", "minLength": 1 },
+        "wasmOptVersion": { "type": "string", "minLength": 1 },
+        "wasmOptSha256": { "$ref": "#/$defs/sha256" },
+        "bun": { "type": "string", "minLength": 1 }
+      }
+    },
+    "rustProfile": {
+      "const": { "optLevel": 3, "lto": "fat", "codegenUnits": 1 }
+    },
+    "postLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputWasmSha256", "compression"],
+      "properties": {
+        "inputWasmSha256": { "$ref": "#/$defs/sha256" },
+        "compression": { "const": { "gzipLevel": 9, "brotliQuality": 11, "brotliMode": "generic" } }
+      }
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["wasmOpt", "inputWasmSha256", "artifactPath", "artifact"],
+        "properties": {
+          "wasmOpt": { "enum": ["-O3", "-Os", "-Oz"] },
+          "inputWasmSha256": { "$ref": "#/$defs/sha256" },
+          "artifactPath": { "type": "string", "minLength": 1 },
+          "artifact": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["rawBytes", "gzipBytes", "brotliBytes", "sha256"],
+            "properties": {
+              "rawBytes": { "type": "integer", "minimum": 1 },
+              "gzipBytes": { "type": "integer", "minimum": 1 },
+              "brotliBytes": { "type": "integer", "minimum": 1 },
+              "sha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        }
+      }
+    },
+    "completion": {
+      "const": {
+        "status": "gates-required",
+        "required": ["formulaGate", "renderGate", "storeOnlyProbe"]
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

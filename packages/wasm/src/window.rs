@@ -6,7 +6,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::translate_relative_refs;
 use crate::query::matches_needle;
-use crate::sheet::{formula_error_at, CondPred, SheetData};
+use crate::sheet::{formula_error_with_entry, CondPred, SheetData};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, AbsCellKey, EvalResult, FormulaError, FormulaValueKind, StringPool, Value, KIND_BOOL,
@@ -16,9 +16,9 @@ use crate::types::{
 #[wasm_bindgen]
 impl CellStore {
     /// One bulk read of a rectangular window for the renderer. Returns
-    /// contiguous typed arrays (row-major over `rows x cols`) plus the unique
-    /// strings referenced by the window, so the host paints without crossing
-    /// the boundary per cell.
+    /// contiguous packed cell data (row-major over `rows x cols`) plus the
+    /// unique strings referenced by the window, so the host paints without
+    /// crossing the boundary per cell.
     #[wasm_bindgen(js_name = getWindow)]
     pub fn get_window(
         &self,
@@ -34,7 +34,9 @@ impl CellStore {
         let row_end = row_end.min(s.row_count);
         let n_rows = row_end.saturating_sub(row_start);
         let n_cols = cols.len();
-        let cells = n_rows.saturating_mul(n_cols);
+        let Some(cells) = n_rows.checked_mul(n_cols) else {
+            return WindowView::empty();
+        };
 
         let mut kind = vec![KIND_EMPTY; cells];
         let mut num = vec![0.0f64; cells];
@@ -87,9 +89,9 @@ impl CellStore {
             &strings,
         );
 
-        WindowView {
-            n_rows: n_rows as u32,
-            n_cols: n_cols as u32,
+        WindowView::new(
+            n_rows,
+            n_cols,
             kind,
             num,
             str_local,
@@ -98,7 +100,7 @@ impl CellStore {
             strings,
             style_dict,
             cond_matches,
-        }
+        )
     }
 
     /// Bulk read of an explicit row list (sorted/filtered views) — same output
@@ -110,7 +112,9 @@ impl CellStore {
         };
         let n_rows = rows.len();
         let n_cols = cols.len();
-        let cells = n_rows.saturating_mul(n_cols);
+        let Some(cells) = n_rows.checked_mul(n_cols) else {
+            return WindowView::empty();
+        };
 
         let mut kind = vec![KIND_EMPTY; cells];
         let mut num = vec![0.0f64; cells];
@@ -165,9 +169,9 @@ impl CellStore {
             &strings,
         );
 
-        WindowView {
-            n_rows: n_rows as u32,
-            n_cols: n_cols as u32,
+        WindowView::new(
+            n_rows,
+            n_cols,
             kind,
             num,
             str_local,
@@ -176,7 +180,7 @@ impl CellStore {
             strings,
             style_dict,
             cond_matches,
-        }
+        )
     }
 }
 
@@ -215,15 +219,14 @@ pub(crate) fn fill_window_cell(
             }
         }
         KIND_FORMULA => {
-            let error = cell_key(row, col).and_then(|key| formula_error_at(sheet, key));
+            let key = cell_key(row, col);
+            let entry = key.and_then(|key| sheet.formulas.get(&key));
+            let error = key.and_then(|key| formula_error_with_entry(sheet, key, entry));
             if let Some(error) = error {
                 kind[dst] = KIND_STRING;
                 str_local[dst] = local_error_index(error, error_slots, strings);
             } else {
-                let value_kind = cell_key(row, col)
-                    .and_then(|key| sheet.formulas.get(&key))
-                    .map(|entry| entry.value_kind);
-                match value_kind {
+                match entry.map(|entry| entry.value_kind) {
                     Some(FormulaValueKind::Bool) => {
                         kind[dst] = KIND_BOOL;
                         num[dst] = sheet.num_at(src);
@@ -396,36 +399,144 @@ fn cell_text<'a>(
     }
 }
 
+const WINDOW_PACKED_MAGIC: u32 = 0x3157_4e53;
+const WINDOW_PACKED_VERSION: u32 = 1;
+const WINDOW_PACKED_HEADER_BYTES: usize = 10 * std::mem::size_of::<u32>();
+
 /// A bulk window of resolved cells, row-major over `n_rows x n_cols`.
 #[wasm_bindgen]
 pub struct WindowView {
     n_rows: u32,
     n_cols: u32,
-    kind: Vec<u8>,
-    num: Vec<f64>,
-    str_local: Vec<i32>,
-    style_local: Vec<u32>,
-    string_ids: Vec<u32>,
+    packed: Vec<u8>,
     strings: Vec<String>,
-    style_dict: Vec<u32>,
-    cond_matches: Vec<u32>,
 }
 
 impl WindowView {
-    pub(crate) fn empty() -> Self {
+    #[allow(clippy::too_many_arguments)]
+    fn new(
+        n_rows: usize,
+        n_cols: usize,
+        kind: Vec<u8>,
+        num: Vec<f64>,
+        str_local: Vec<i32>,
+        style_local: Vec<u32>,
+        string_ids: Vec<u32>,
+        strings: Vec<String>,
+        style_dict: Vec<u32>,
+        cond_matches: Vec<u32>,
+    ) -> Self {
+        let packed = pack_window(
+            n_rows,
+            n_cols,
+            &kind,
+            &num,
+            &str_local,
+            &style_local,
+            &string_ids,
+            style_dict.as_slice(),
+            &cond_matches,
+            strings.len(),
+        )
+        .unwrap_or_default();
         Self {
-            n_rows: 0,
-            n_cols: 0,
-            kind: Vec::new(),
-            num: Vec::new(),
-            str_local: Vec::new(),
-            style_local: Vec::new(),
-            string_ids: Vec::new(),
-            strings: Vec::new(),
-            style_dict: Vec::new(),
-            cond_matches: Vec::new(),
+            n_rows: n_rows.try_into().unwrap_or_default(),
+            n_cols: n_cols.try_into().unwrap_or_default(),
+            packed,
+            strings,
         }
     }
+
+    pub(crate) fn empty() -> Self {
+        Self::new(
+            0,
+            0,
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
+        )
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn pack_window(
+    n_rows: usize,
+    n_cols: usize,
+    kind: &[u8],
+    num: &[f64],
+    str_local: &[i32],
+    style_local: &[u32],
+    string_ids: &[u32],
+    style_dict: &[u32],
+    cond_matches: &[u32],
+    string_count: usize,
+) -> Option<Vec<u8>> {
+    let cells = n_rows.checked_mul(n_cols)?;
+    if kind.len() != cells
+        || num.len() != cells
+        || str_local.len() != cells
+        || style_local.len() != cells
+        || string_ids.len() != cells
+        || (!cond_matches.is_empty() && cond_matches.len() != cells)
+    {
+        return None;
+    }
+
+    let numbers_start = align_to_8(WINDOW_PACKED_HEADER_BYTES.checked_add(cells)?)?;
+    let string_ids_start = numbers_start.checked_add(cells.checked_mul(8)?)?;
+    let string_index_start = string_ids_start.checked_add(cells.checked_mul(4)?)?;
+    let style_index_start = string_index_start.checked_add(cells.checked_mul(4)?)?;
+    let style_dict_start = style_index_start.checked_add(cells.checked_mul(4)?)?;
+    let cond_matches_start = style_dict_start.checked_add(style_dict.len().checked_mul(4)?)?;
+    let total_bytes = cond_matches_start.checked_add(cond_matches.len().checked_mul(4)?)?;
+
+    let header = [
+        WINDOW_PACKED_MAGIC,
+        WINDOW_PACKED_VERSION,
+        WINDOW_PACKED_HEADER_BYTES.try_into().ok()?,
+        total_bytes.try_into().ok()?,
+        n_rows.try_into().ok()?,
+        n_cols.try_into().ok()?,
+        cells.try_into().ok()?,
+        style_dict.len().try_into().ok()?,
+        cond_matches.len().try_into().ok()?,
+        string_count.try_into().ok()?,
+    ];
+    let mut packed = Vec::with_capacity(total_bytes);
+    for word in header {
+        packed.extend_from_slice(&word.to_le_bytes());
+    }
+    packed.extend_from_slice(kind);
+    packed.resize(numbers_start, 0);
+    for value in num {
+        packed.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in string_ids {
+        packed.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in str_local {
+        packed.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in style_local {
+        packed.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in style_dict {
+        packed.extend_from_slice(&value.to_le_bytes());
+    }
+    for value in cond_matches {
+        packed.extend_from_slice(&value.to_le_bytes());
+    }
+    debug_assert_eq!(packed.len(), total_bytes);
+    Some(packed)
+}
+
+fn align_to_8(value: usize) -> Option<usize> {
+    value.checked_add(7).map(|end| end & !7)
 }
 
 #[wasm_bindgen]
@@ -440,53 +551,27 @@ impl WindowView {
         self.n_cols
     }
 
-    /// Consume and return the per-cell tag array: 0 empty, 1 number, 2 string.
-    #[wasm_bindgen(js_name = takeKinds)]
-    pub fn take_kinds(&mut self) -> Vec<u8> {
-        std::mem::take(&mut self.kind)
+    /// Consume the complete fixed-width window payload. The returned
+    /// `Uint8Array` is copied by wasm-bindgen into JS-owned memory.
+    #[wasm_bindgen(js_name = takePacked)]
+    pub fn take_packed(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.packed)
     }
 
-    /// Consume and return per-cell numeric payloads (valid where kind == 1).
-    #[wasm_bindgen(js_name = takeNumbers)]
-    pub fn take_numbers(&mut self) -> Vec<f64> {
-        std::mem::take(&mut self.num)
-    }
-
-    /// Consume and return per-cell indices into `strings` (string cells only).
-    #[wasm_bindgen(js_name = takeStringIndex)]
-    pub fn take_string_index(&mut self) -> Vec<i32> {
-        std::mem::take(&mut self.str_local)
-    }
-
-    /// Consume and return per-cell GLOBAL string-pool ids; `u32::MAX` means none.
-    #[wasm_bindgen(js_name = takeStringIds)]
-    pub fn take_string_ids(&mut self) -> Vec<u32> {
-        std::mem::take(&mut self.string_ids)
-    }
-
-    /// Consume and return per-cell WINDOW-LOCAL style indices into the dict.
-    #[wasm_bindgen(js_name = takeStyleIndex)]
-    pub fn take_style_index(&mut self) -> Vec<u32> {
-        std::mem::take(&mut self.style_local)
-    }
-
-    /// Consume and return the unique global style-dictionary ids referenced by
-    /// this window, in local-index order; the host maps each to a `CellStyle`.
-    #[wasm_bindgen(js_name = takeStyleDict)]
-    pub fn take_style_dict(&mut self) -> Vec<u32> {
-        std::mem::take(&mut self.style_dict)
-    }
-
-    /// Consume and return unique strings referenced by this window.
+    /// Consume formula-error sentinel strings referenced by the packed data.
     #[wasm_bindgen(js_name = takeStrings)]
     pub fn take_strings(&mut self) -> Vec<String> {
         std::mem::take(&mut self.strings)
     }
+}
 
-    /// Consume and return per-cell conditional-format rule bitmasks; empty
-    /// when the sheet has no rules.
-    #[wasm_bindgen(js_name = takeCondMatches)]
-    pub fn take_cond_matches(&mut self) -> Vec<u32> {
-        std::mem::take(&mut self.cond_matches)
+#[cfg(test)]
+mod tests {
+    use super::pack_window;
+
+    #[test]
+    fn packed_window_rejects_mismatched_cell_buffers() {
+        assert!(pack_window(1, 1, &[], &[0.0], &[0], &[0], &[0], &[], &[], 0).is_none());
+        assert!(pack_window(1, 1, &[0], &[0.0], &[0], &[0], &[0], &[], &[0, 0], 0).is_none());
     }
 }

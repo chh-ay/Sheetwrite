@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, glob, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { basename, extname, join, resolve, sep } from "node:path";
+import { basename, dirname, extname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 import { bindCanonicalTarballIntegrities } from "../../scripts/release-lock-integrity.mjs";
@@ -66,6 +66,21 @@ function run(command, args, cwd) {
   });
 }
 
+async function copyPublishEntry(sourceRoot, packageRoot, entry) {
+  if (!/[*?[\]{}]/u.test(entry)) {
+    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
+    return;
+  }
+  const matches = [];
+  for await (const path of glob(entry, { cwd: sourceRoot })) matches.push(path);
+  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
+  for (const path of matches) {
+    const target = join(packageRoot, path);
+    await mkdir(dirname(target), { recursive: true });
+    await cp(join(sourceRoot, path), target);
+  }
+}
+
 async function stageAndPack(packageDirectory, filename) {
   const sourceRoot = join(repositoryRoot, packageDirectory);
   const packageRoot = join(stagingRoot, basename(packageDirectory));
@@ -73,7 +88,7 @@ async function stageAndPack(packageDirectory, filename) {
   const publishFiles = [...(manifest.files ?? []), "README.md"];
   await mkdir(packageRoot, { recursive: true });
   for (const path of publishFiles) {
-    await cp(join(sourceRoot, path), join(packageRoot, path), { recursive: true });
+    await copyPublishEntry(sourceRoot, packageRoot, path);
   }
   await cp(join(repositoryRoot, "LICENSE"), join(packageRoot, "LICENSE"));
   if (manifest.dependencies) {

@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 export default {
   mode: "production",
   entry: "./src/main.js",
-  devtool: false,
+  devtool: "hidden-source-map",
   output: {
     path: resolve("dist"),
     filename: "main.js",

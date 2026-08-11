@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { WASM_PACK_VERSION } from "./install-wasm-pack.js";
 import {
   BUN_VERSION,
@@ -17,6 +17,14 @@ import {
 export const RELEASE_ARTIFACT_SCHEMA_VERSION = 2;
 export const RELEASE_ARTIFACT_MANIFEST = "release-artifacts.json";
 export const RELEASE_BUILD_COMMAND = "bun run build:packages";
+
+export function assertPublishedFilePolicy(packageName: string, files: readonly string[]): void {
+  if (packageName !== "@sheetwrite/core") return;
+  const sourceMap = files.find((path) => path.toLowerCase().endsWith(".map"));
+  if (sourceMap !== undefined) {
+    throw new Error(`${packageName} published files must exclude source maps; found ${sourceMap}`);
+  }
+}
 
 interface PackageManifest {
   readonly name: string;
@@ -322,6 +330,7 @@ export function validateReleaseManifest(manifest: ReleaseArtifactManifest): void
     if ([...artifact.files].sort().some((path, fileIndex) => path !== artifact.files[fileIndex])) {
       throw new Error(`${artifact.name} packed file list must be sorted`);
     }
+    assertPublishedFilePolicy(artifact.name, artifact.files);
     assertString(artifact.shasum, `${artifact.name} shasum`);
     if (!/^[0-9a-f]{40}$/.test(artifact.shasum)) {
       throw new Error(`${artifact.name} shasum must be SHA-1 hex`);
@@ -373,7 +382,6 @@ const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>> = {
     "LICENSE",
     "dist/index.d.ts",
     "dist/index.js",
-    "dist/index.js.map",
     "dist/worker.d.ts",
     "dist/worker.js",
     "styles.css",
@@ -415,6 +423,15 @@ function packageTargets(manifest: PackageManifest): string[] {
   return [...targets];
 }
 
+function manifestEntryExists(entry: string, files: readonly string[]): boolean {
+  const path = entry.replace(/^\.\//, "").replace(/\/$/, "");
+  if (/[*?[\]{}]/u.test(path)) {
+    const glob = new Bun.Glob(path);
+    return files.some((file) => glob.match(file));
+  }
+  return files.includes(path) || files.some((file) => file.startsWith(`${path}/`));
+}
+
 function validatePackedManifest(
   artifact: ReleasePackageArtifact,
   manifest: PackageManifest,
@@ -452,8 +469,7 @@ function validatePackedManifest(
     }
   }
   for (const declared of manifest.files ?? []) {
-    const path = declared.replace(/^\.\//, "").replace(/\/$/, "");
-    if (!files.has(path) && !artifact.files.some((file) => file.startsWith(`${path}/`))) {
+    if (!manifestEntryExists(declared, artifact.files)) {
       throw new Error(
         `${artifact.name} declared file target does not exist with exact case: ${declared}`,
       );
@@ -576,6 +592,31 @@ interface StagedPackage {
   readonly internalDependencies: Readonly<Record<string, string>>;
 }
 
+async function copyManifestEntry(
+  sourceRoot: string,
+  packageRoot: string,
+  entry: string,
+): Promise<void> {
+  if (!/[*?[\]{}]/u.test(entry)) {
+    await cp(join(sourceRoot, entry), join(packageRoot, entry), { recursive: true });
+    return;
+  }
+  const matches = Array.from(
+    new Bun.Glob(entry).scanSync({
+      cwd: sourceRoot,
+      dot: true,
+      onlyFiles: true,
+      followSymlinks: false,
+    }),
+  );
+  if (matches.length === 0) throw new Error(`Package file pattern matched nothing: ${entry}`);
+  for (const path of matches) {
+    const target = join(packageRoot, path);
+    await mkdir(dirname(target), { recursive: true });
+    await cp(join(sourceRoot, path), target);
+  }
+}
+
 async function stagePackage(
   source: { readonly directory: string; readonly manifest: PackageManifest },
   stageRoot: string,
@@ -585,7 +626,7 @@ async function stagePackage(
   await mkdir(target, { recursive: true });
   const paths = new Set([...(source.manifest.files ?? []), "LICENSE", "README.md"]);
   for (const path of paths) {
-    await cp(join(source.directory, path), join(target, path), { recursive: true });
+    await copyManifestEntry(source.directory, target, path);
   }
   const scripts = { ...source.manifest.scripts };
   delete scripts.prepublishOnly;

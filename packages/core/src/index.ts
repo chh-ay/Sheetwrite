@@ -107,8 +107,6 @@ export {
   resolveThemeFromCss,
 } from "./grid.js";
 export {
-  cloneCellHyperlink,
-  createHyperlinkId,
   hyperlinkAt,
   isSafeExternalHyperlink,
   isValidCellHyperlink,

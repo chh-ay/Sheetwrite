@@ -1,6 +1,12 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 import { initSheetwrite } from "../src/grid.js";
-import { KIND_BOOL, KIND_NUMBER, KIND_STRING, NO_STRING } from "../src/store/wire-tags.js";
+import {
+  KIND_BOOL,
+  KIND_EMPTY,
+  KIND_NUMBER,
+  KIND_STRING,
+  NO_STRING,
+} from "../src/store/wire-tags.js";
 import { SheetwriteStore } from "../src/store.js";
 import { makeWorkbook } from "./fixtures.js";
 
@@ -32,8 +38,13 @@ describe("cell-kind wire tags", () => {
         ],
       });
 
-      const view = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0, 1, 2]);
-      expect(Array.from(view.valueKinds ?? [])).toEqual([KIND_NUMBER, KIND_STRING, KIND_BOOL]);
+      const view = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0, 1, 2, 3]);
+      expect(Array.from(view.valueKinds ?? [])).toEqual([
+        KIND_NUMBER,
+        KIND_STRING,
+        KIND_BOOL,
+        KIND_EMPTY,
+      ]);
       expect(view.stringPoolIds?.[0]).toBe(NO_STRING);
     } finally {
       store.dispose();

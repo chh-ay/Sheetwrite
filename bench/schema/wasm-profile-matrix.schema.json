@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sheetwrite.dev/schemas/wasm-profile-matrix-v1.json",
+  "title": "Sheetwrite controlled WASM post-link profile matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "protocol",
+    "provenance",
+    "rustProfile",
+    "postLink",
+    "decisionPolicy",
+    "captureOrder",
+    "variants",
+    "storeOnlyProbe"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "protocol": { "const": "wasm-post-link-profile-matrix-v1" },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commit",
+        "dirty",
+        "timestamp",
+        "host",
+        "rustc",
+        "cargo",
+        "wasmPack",
+        "wasmOptVersion",
+        "wasmOptSha256",
+        "bun"
+      ],
+      "properties": {
+        "commit": { "$ref": "#/$defs/commit" },
+        "dirty": { "const": false },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "host": { "type": "string", "minLength": 1 },
+        "rustc": { "type": "string", "minLength": 1 },
+        "cargo": { "type": "string", "minLength": 1 },
+        "wasmPack": { "type": "string", "minLength": 1 },
+        "wasmOptVersion": { "type": "string", "minLength": 1 },
+        "wasmOptSha256": { "$ref": "#/$defs/sha256" },
+        "bun": { "type": "string", "minLength": 1 }
+      }
+    },
+    "rustProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["optLevel", "lto", "codegenUnits"],
+      "properties": {
+        "optLevel": { "const": 3 },
+        "lto": { "const": "fat" },
+        "codegenUnits": { "const": 1 }
+      }
+    },
+    "postLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputWasmSha256", "compression"],
+      "properties": {
+        "inputWasmSha256": { "$ref": "#/$defs/sha256" },
+        "compression": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["gzipLevel", "brotliQuality", "brotliMode"],
+          "properties": {
+            "gzipLevel": { "const": 9 },
+            "brotliQuality": { "const": 11 },
+            "brotliMode": { "const": "generic" }
+          }
+        }
+      }
+    },
+    "decisionPolicy": {
+      "const": {
+        "sizeMetric": "brotliBytes",
+        "requireFormulaGate": true,
+        "requireRenderGate": true
+      }
+    },
+    "captureOrder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["formula", "render"],
+      "properties": {
+        "formula": { "$ref": "#/$defs/profileOrder" },
+        "render": { "$ref": "#/$defs/profileOrder" }
+      }
+    },
+    "variants": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": { "$ref": "#/$defs/variant" }
+    },
+    "storeOnlyProbe": { "$ref": "#/$defs/storeOnlyProbe" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "profile": { "enum": ["-O3", "-Os", "-Oz"] },
+    "profileOrder": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/profile" },
+      "allOf": [
+        { "contains": { "const": "-O3" } },
+        { "contains": { "const": "-Os" } },
+        { "contains": { "const": "-Oz" } }
+      ]
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "commands",
+        "exitCode",
+        "artifactPath",
+        "evidenceSha256",
+        "wasmSha256",
+        "commit",
+        "runnerFingerprint"
+      ],
+      "properties": {
+        "status": { "enum": ["passed", "failed"] },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        },
+        "exitCode": { "type": "integer", "minimum": 0 },
+        "artifactPath": { "type": "string", "minLength": 1 },
+        "evidenceSha256": { "$ref": "#/$defs/sha256" },
+        "wasmSha256": { "$ref": "#/$defs/sha256" },
+        "commit": { "$ref": "#/$defs/commit" },
+        "runnerFingerprint": { "$ref": "#/$defs/sha256" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "passed" } } },
+          "then": { "properties": { "exitCode": { "const": 0 } } }
+        },
+        {
+          "if": { "properties": { "status": { "const": "failed" } } },
+          "then": { "properties": { "exitCode": { "minimum": 1 } } }
+        }
+      ]
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wasmOpt", "inputWasmSha256", "artifact", "formulaGate", "renderGate"],
+      "properties": {
+        "wasmOpt": { "$ref": "#/$defs/profile" },
+        "inputWasmSha256": { "$ref": "#/$defs/sha256" },
+        "artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["rawBytes", "gzipBytes", "brotliBytes", "sha256"],
+          "properties": {
+            "rawBytes": { "type": "integer", "minimum": 1 },
+            "gzipBytes": { "type": "integer", "minimum": 1 },
+            "brotliBytes": { "type": "integer", "minimum": 1 },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "formulaGate": { "$ref": "#/$defs/gate" },
+        "renderGate": { "$ref": "#/$defs/gate" }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "owner", "dependency", "reason"],
+      "properties": {
+        "id": { "enum": ["formula-entry-ast", "dependency-index"] },
+        "kind": { "const": "dependency-cycle" },
+        "owner": { "type": "string", "minLength": 1 },
+        "dependency": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "minLength": 1 }
+      }
+    },
+    "storeOnlyProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provenance",
+        "command",
+        "outcome",
+        "exitCode",
+        "stdoutSha256",
+        "stderrSha256",
+        "blockers"
+      ],
+      "properties": {
+        "provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["commit", "dirty", "timestamp"],
+          "properties": {
+            "commit": { "$ref": "#/$defs/commit" },
+            "dirty": { "const": false },
+            "timestamp": { "type": "string", "format": "date-time" }
+          }
+        },
+        "command": {
+          "const": [
+            "cargo",
+            "check",
+            "--target",
+            "wasm32-unknown-unknown",
+            "--no-default-features",
+            "--message-format=json"
+          ]
+        },
+        "outcome": { "enum": ["compiled", "blocked", "failed"] },
+        "exitCode": { "type": "integer", "minimum": 0 },
+        "stdoutSha256": { "$ref": "#/$defs/sha256" },
+        "stderrSha256": { "$ref": "#/$defs/sha256" },
+        "blockers": { "type": "array", "items": { "$ref": "#/$defs/blocker" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "outcome": { "const": "compiled" } } },
+          "then": {
+            "properties": {
+              "exitCode": { "const": 0 },
+              "blockers": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "blocked" } } },
+          "then": {
+            "properties": {
+              "exitCode": { "minimum": 1 },
+              "blockers": {
+                "minItems": 2,
+                "maxItems": 2,
+                "allOf": [
+                  { "contains": { "properties": { "id": { "const": "formula-entry-ast" } } } },
+                  { "contains": { "properties": { "id": { "const": "dependency-index" } } } }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "outcome": { "const": "failed" } } },
+          "then": {
+            "properties": {
+              "exitCode": { "minimum": 1 },
+              "blockers": { "maxItems": 0 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -97,7 +97,6 @@ const REQUIRED_FILES: Readonly<Record<string, readonly string[]>> = {
     "LICENSE",
     "dist/index.d.ts",
     "dist/index.js",
-    "dist/index.js.map",
     "dist/worker.d.ts",
     "dist/worker.js",
     "styles.css",
@@ -185,6 +184,22 @@ async function writeTarball(
 describe("canonical release artifacts", () => {
   it("accepts a valid canonical manifest", () => {
     expect(() => validateReleaseManifest(manifest())).not.toThrow();
+  });
+
+  it("rejects source maps in the published core package", () => {
+    const base = manifest();
+    const packages = base.packages.map((artifact) =>
+      artifact.name === "@sheetwrite/core"
+        ? {
+            ...artifact,
+            fileCount: 2,
+            files: ["dist/index.js.map", "package.json"],
+          }
+        : artifact,
+    );
+    expect(() => validateReleaseManifest({ ...base, packages })).toThrow(
+      "@sheetwrite/core published files must exclude source maps",
+    );
   });
 
   it("rewrites workspace ranges and enforces release cleanliness", () => {

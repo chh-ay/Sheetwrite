@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, describe, expect, it } from "bun:test";
+import { rmSync } from "node:fs";
 import { resolve } from "node:path";
 import {
   type ReleaseCommandContext,
@@ -7,6 +8,10 @@ import {
 } from "./release-verify.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
+
+afterEach(() => {
+  rmSync(resolve(import.meta.dir, "size-report-failure.json"), { force: true });
+});
 
 function guardedRun(command: readonly [string, ...string[]]): {
   readonly exitCode: number;

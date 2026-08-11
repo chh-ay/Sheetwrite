@@ -106,6 +106,8 @@ describe("SheetwriteStore", () => {
     // row 4 begins at index 3
     expect(view.values[3]).toBe("Customer 4");
     expect(view.styleIds.length).toBe(9);
+    expect(view.ffiOutputBytes).toBeGreaterThan(0);
+    expect(Reflect.get(view, "ffiOutputAllocationEvents")).toBe(1);
   });
 
   it("carries a non-default style id and exposes it via the dictionary", () => {
@@ -1929,7 +1931,9 @@ describe("paged datasource storage", () => {
     });
     expect(store.getCellLoadState(addr(0, 0))).toBe("unloaded");
     expect(store.getCell(addr(0, 0)).resolved).toBe("#LOADING!");
-    expect(store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]).values).toEqual(["#LOADING!"]);
+    const loadingWindow = store.getVisibleWindow("s1", { start: 0, end: 1 }, [0]);
+    expect(loadingWindow.values).toEqual(["#LOADING!"]);
+    expect(Reflect.get(loadingWindow, "ffiOutputAllocationEvents")).toBe(2);
     expect(store.queryCapability("s1")).toEqual({
       status: "incomplete",
       loadedCells: 0,

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { createCombinationFailures } from "../src/render-driver.js";
-import { DIAGNOSTIC_RENDER_SCENARIOS, RENDER_SCENARIOS } from "../src/render-protocol.js";
+import {
+  DIAGNOSTIC_RENDER_SCENARIOS,
+  RENDER_SCENARIOS,
+  WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
+} from "../src/render-protocol.js";
 
 const configuration = {
   runId: "launch-fixture",
@@ -36,6 +40,10 @@ describe("isolated browser failure envelopes", () => {
       new Error("browser executable does not exist"),
     );
     expect(results.map((result) => result.scenarioId)).toEqual(scenarios);
+    expect(
+      results.find((result) => result.scenarioId === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID)
+        ?.dataValidity,
+    ).toBe("pixel-data-invalid");
   });
 
   test("timeouts retain timeout/crash diagnostics in every cell", () => {

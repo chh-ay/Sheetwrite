@@ -19,6 +19,7 @@ import {
   getNumberFormatResourceStatsForTest,
   resetNumberFormatResourcesForTest,
 } from "../../packages/core/src/number-format.js";
+import type { InstrumentedVisibleWindowView } from "../../packages/core/src/store/window-reader.js";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
 import { COLUMNS, type ColumnarDataset, datasetChecksum, makeColumnar, toAoA } from "./dataset.js";
@@ -36,6 +37,7 @@ import {
   type RenderResourceMetrics,
   type ScenarioId,
   type ScenarioResult,
+  WINDOW_TRANSFER_SCENARIO_IDS,
 } from "./render-protocol.js";
 import {
   type CellSelection,
@@ -44,6 +46,8 @@ import {
   type RenderBenchAdapter,
   runRenderScenario,
   type ScrollObservation,
+  type WindowReadDiagnosticMode,
+  type WindowTransferCounters,
 } from "./render-scenarios.js";
 
 const SHEET = "bench";
@@ -62,6 +66,7 @@ interface PageConfiguration {
   readonly minimumSampleDurationMs: number;
   readonly runId: string;
   readonly round: number;
+  readonly windowTransferDiagnostic: boolean;
 }
 
 declare global {
@@ -119,7 +124,19 @@ class SheetwriteAdapter implements RenderBenchAdapter {
   private readonly dataset: ColumnarDataset;
   private formulaDenseRows = 0;
   private textHeavyRows = 0;
-  constructor(dataset: ColumnarDataset) {
+  private windowReadDiagnosticMode: WindowReadDiagnosticMode = "baseline";
+  private priorDecodedView: InstrumentedVisibleWindowView | undefined;
+  private windowTransferCountersState = {
+    logicalFrames: 0,
+    windowReadRequests: 0,
+    logicalWindowReads: 0,
+    copiedBytes: 0,
+    outputAllocationEvents: 0,
+  };
+  constructor(
+    dataset: ColumnarDataset,
+    private readonly windowTransferDiagnostic: boolean,
+  ) {
     this.dataset = dataset;
     this.initialRowCount = dataset.rowCount;
     this.data = {
@@ -140,6 +157,47 @@ class SheetwriteAdapter implements RenderBenchAdapter {
       workbook: makeWorkbook(this.initialRowCount),
       data: this.data,
     });
+    if (this.windowTransferDiagnostic) this.installWindowTransferDiagnostic();
+  }
+
+  private installWindowTransferDiagnostic(): void {
+    const originalRead = this.grid.store.getVisibleWindow.bind(this.grid.store);
+    this.grid.store.getVisibleWindow = ((...args) => {
+      this.windowTransferCountersState.windowReadRequests++;
+      if (this.windowReadDiagnosticMode === "reuse-decoded-view-upper-bound") {
+        if (!this.priorDecodedView) {
+          throw new Error("window-transfer upper bound has no prior decoded view");
+        }
+        return this.priorDecodedView;
+      }
+      const view = originalRead(...args) as InstrumentedVisibleWindowView;
+      const copiedBytes = view.ffiOutputBytes;
+      const outputAllocationEvents = view.ffiOutputAllocationEvents;
+      if (
+        typeof copiedBytes !== "number" ||
+        !Number.isSafeInteger(copiedBytes) ||
+        copiedBytes < 0 ||
+        typeof outputAllocationEvents !== "number" ||
+        !Number.isSafeInteger(outputAllocationEvents) ||
+        outputAllocationEvents <= 0
+      ) {
+        throw new Error("visible-window read omitted exact output transfer counters");
+      }
+      this.windowTransferCountersState.logicalWindowReads++;
+      this.windowTransferCountersState.copiedBytes += copiedBytes;
+      this.windowTransferCountersState.outputAllocationEvents += outputAllocationEvents;
+      this.priorDecodedView = view;
+      return view;
+    }) as typeof this.grid.store.getVisibleWindow;
+
+    const renderer = Reflect.get(this.grid, "renderer") as {
+      paint(view: InstrumentedVisibleWindowView): void;
+    };
+    const originalPaint = renderer.paint.bind(renderer);
+    renderer.paint = (view): void => {
+      this.windowTransferCountersState.logicalFrames++;
+      originalPaint(view);
+    };
   }
 
   isMountedAndAccessible(): boolean {
@@ -383,6 +441,33 @@ class SheetwriteAdapter implements RenderBenchAdapter {
       intersectingMerges(prepareMergeIndex(merges), 0, 20, [0, 1, 2, 3, 4]);
     }
     return getMergeIndexResourceStatsForTest();
+  }
+
+  setWindowReadDiagnosticMode(mode: WindowReadDiagnosticMode): void {
+    if (!this.windowTransferDiagnostic) {
+      throw new Error("window-transfer mode requires benchmark diagnostic configuration");
+    }
+    if (mode === "reuse-decoded-view-upper-bound" && !this.priorDecodedView) {
+      this.windowReadDiagnosticMode = "baseline";
+      this.grid.store.getVisibleWindow(
+        SHEET,
+        { start: 0, end: Math.min(32, this.initialRowCount) },
+        Array.from({ length: this.colCount }, (_, column) => column),
+      );
+    }
+    this.windowReadDiagnosticMode = mode;
+  }
+
+  resetWindowTransferCounters(): void {
+    this.windowTransferCountersState.logicalFrames = 0;
+    this.windowTransferCountersState.windowReadRequests = 0;
+    this.windowTransferCountersState.logicalWindowReads = 0;
+    this.windowTransferCountersState.copiedBytes = 0;
+    this.windowTransferCountersState.outputAllocationEvents = 0;
+  }
+
+  windowTransferCounters(): WindowTransferCounters {
+    return { ...this.windowTransferCountersState };
   }
 
   destroy(): void {
@@ -643,6 +728,24 @@ class HandsontableAdapter implements RenderBenchAdapter {
     return getMergeIndexResourceStatsForTest();
   }
 
+  setWindowReadDiagnosticMode(_mode: WindowReadDiagnosticMode): void {
+    throw new Error("window-transfer diagnostics support only sheetwrite");
+  }
+
+  resetWindowTransferCounters(): void {
+    throw new Error("window-transfer diagnostics support only sheetwrite");
+  }
+
+  windowTransferCounters(): WindowTransferCounters {
+    return {
+      logicalFrames: 0,
+      windowReadRequests: 0,
+      logicalWindowReads: 0,
+      copiedBytes: 0,
+      outputAllocationEvents: 0,
+    };
+  }
+
   destroy(): void {
     this.hot.destroy();
   }
@@ -686,6 +789,7 @@ function teardownFailures(results: readonly ScenarioResult[], error: unknown): S
       rows: result.rows,
       scenarioId: result.scenarioId,
       group: result.group,
+      ...(result.dataValidity === undefined ? {} : { dataValidity: result.dataValidity }),
       status: "failed",
       stage: "teardown",
       errorClass: normalized.name || "Error",
@@ -721,7 +825,7 @@ async function run(configuration: PageConfiguration): Promise<void> {
 
   let adapter: RenderBenchAdapter =
     configuration.engine === "sheetwrite"
-      ? new SheetwriteAdapter(dataset)
+      ? new SheetwriteAdapter(dataset, configuration.windowTransferDiagnostic)
       : new HandsontableAdapter(dataset);
   window.__benchStage = "mount";
   setStatus(`mounting ${configuration.engine}`);
@@ -772,7 +876,7 @@ async function run(configuration: PageConfiguration): Promise<void> {
       host.replaceChildren();
       adapter =
         configuration.engine === "sheetwrite"
-          ? new SheetwriteAdapter(dataset)
+          ? new SheetwriteAdapter(dataset, configuration.windowTransferDiagnostic)
           : new HandsontableAdapter(dataset);
       adapter.mount(host);
       await settle();
@@ -820,6 +924,30 @@ function readConfiguration(params: URLSearchParams): PageConfiguration {
       throw new Error(`unknown render benchmark scenario: ${scenarioId}`);
     }
   }
+  const diagnostic = params.get("diagnostic");
+  if (diagnostic !== null && diagnostic !== "window-transfer") {
+    throw new Error("unknown render benchmark diagnostic configuration");
+  }
+  const windowTransferDiagnostic = diagnostic === "window-transfer";
+  const requestedWindowTransferScenarios = requestedScenarios.filter((scenario) =>
+    WINDOW_TRANSFER_SCENARIO_IDS.includes(
+      scenario as (typeof WINDOW_TRANSFER_SCENARIO_IDS)[number],
+    ),
+  );
+  if (
+    requestedWindowTransferScenarios.length > 0 &&
+    (!windowTransferDiagnostic ||
+      engine !== "sheetwrite" ||
+      requestedWindowTransferScenarios.length !== WINDOW_TRANSFER_SCENARIO_IDS.length ||
+      !WINDOW_TRANSFER_SCENARIO_IDS.every((scenario) => requestedScenarios.includes(scenario)))
+  ) {
+    throw new Error(
+      "window-transfer scenarios require the complete sheetwrite benchmark diagnostic pair",
+    );
+  }
+  if (windowTransferDiagnostic && requestedWindowTransferScenarios.length === 0) {
+    throw new Error("window-transfer diagnostic configuration requires its scenario pair");
+  }
   return {
     engine,
     scenarios: requestedScenarios as ScenarioId[],
@@ -832,6 +960,7 @@ function readConfiguration(params: URLSearchParams): PageConfiguration {
     ),
     runId,
     round: positiveInteger(params.get("round"), 1),
+    windowTransferDiagnostic,
   };
 }
 

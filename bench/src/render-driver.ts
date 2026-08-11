@@ -27,8 +27,11 @@ import {
   renderBenchmarkMarkdown,
   type ScenarioId,
   type ScenarioResult,
+  scenarioDataValidity,
   scenarioGroup,
   summarizeCompleteness,
+  WINDOW_TRANSFER_ORDER_SEED,
+  WINDOW_TRANSFER_SCENARIO_IDS,
 } from "./render-protocol.js";
 import { counterbalancedOrder } from "./stats.js";
 
@@ -68,6 +71,7 @@ interface CombinationConfiguration {
   readonly timeoutMs: number;
   readonly datasetHash: string;
   readonly browserExecutable?: string;
+  readonly windowTransferDiagnostic?: boolean;
 }
 
 interface CombinationOutput {
@@ -198,6 +202,7 @@ function failureForScenario(
   partialSamples: FailedScenario["partialSamples"] = [],
 ): FailedScenario {
   const failure = normalizedError(error);
+  const dataValidity = scenarioDataValidity(scenarioId);
   return {
     runId: configuration.runId,
     round: configuration.round,
@@ -205,6 +210,7 @@ function failureForScenario(
     rows: configuration.rows,
     scenarioId,
     group: scenarioGroup(scenarioId),
+    ...(dataValidity === undefined ? {} : { dataValidity }),
     status: "failed",
     stage,
     errorClass: failure.name || "Error",
@@ -476,6 +482,9 @@ async function runCombination(
     url.searchParams.set("samples", String(configuration.measuredSamples));
     url.searchParams.set("warmups", String(configuration.warmupSamples));
     url.searchParams.set("minimumSampleMs", String(configuration.minimumSampleDurationMs));
+    if (configuration.windowTransferDiagnostic) {
+      url.searchParams.set("diagnostic", "window-transfer");
+    }
     await page.goto(url.href, { waitUntil: "load", timeout: configuration.timeoutMs });
     stage = "mount";
     await page.waitForFunction(() => window.__benchDone === true, undefined, {
@@ -604,6 +613,13 @@ async function runDriver(args: readonly string[]): Promise<void> {
     configuration.rounds,
     RENDER_ORDER_SEED,
   );
+  const windowTransferScenarioOrder = configuration.diagnostic
+    ? counterbalancedOrder(
+        WINDOW_TRANSFER_SCENARIO_IDS,
+        configuration.rounds,
+        WINDOW_TRANSFER_ORDER_SEED,
+      )
+    : undefined;
   const datasetHashes: Record<string, string> = {};
   for (const rows of configuration.rows) {
     datasetHashes[String(rows)] = datasetChecksum(makeColumnar(rows, DEFAULT_SEED));
@@ -630,6 +646,18 @@ async function runDriver(args: readonly string[]): Promise<void> {
   try {
     for (let roundIndex = 0; roundIndex < engineOrder.length; roundIndex++) {
       const round = roundIndex + 1;
+      const scenarios =
+        windowTransferScenarioOrder === undefined
+          ? configuration.scenarios
+          : [
+              ...configuration.scenarios.filter(
+                (scenario) =>
+                  !WINDOW_TRANSFER_SCENARIO_IDS.includes(
+                    scenario as (typeof WINDOW_TRANSFER_SCENARIO_IDS)[number],
+                  ),
+              ),
+              ...windowTransferScenarioOrder[roundIndex]!,
+            ];
       for (const engine of engineOrder[roundIndex]!) {
         for (const rows of configuration.rows) {
           process.stderr.write(
@@ -640,13 +668,14 @@ async function runDriver(args: readonly string[]): Promise<void> {
             round,
             engine,
             rows,
-            scenarios: configuration.scenarios,
+            scenarios,
             measuredSamples: configuration.measuredSamples,
             warmupSamples: configuration.warmupSamples,
             minimumSampleDurationMs: configuration.minimumSampleDurationMs,
             timeoutMs: configuration.timeoutMs,
             datasetHash: datasetHashes[String(rows)]!,
             browserExecutable: configuration.browserExecutable,
+            windowTransferDiagnostic: configuration.diagnostic,
           });
           results.push(...output.results);
           launchAttempts.push(...output.launchAttempts);
@@ -691,6 +720,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
       orderSeed: RENDER_ORDER_SEED,
       engineOrder,
       launchAttempts,
+      ...(windowTransferScenarioOrder === undefined ? {} : { windowTransferScenarioOrder }),
     },
     config,
     results,

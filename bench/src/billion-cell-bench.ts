@@ -1,4 +1,5 @@
 import ts from "typescript";
+import typeScriptManifest from "../../node_modules/typescript/package.json" with { type: "json" };
 import { DatasourceController } from "../../packages/core/src/datasource-controller.js";
 import { initSheetwrite } from "../../packages/core/src/grid.js";
 import {
@@ -1495,7 +1496,7 @@ export function validateBillionCellBenchmark(
   const toolchain = record(artifact.toolchain, "toolchain");
   exact(toolchain.runtime, "bun", "toolchain.runtime");
   exact(toolchain.bunVersion, Bun.version, "toolchain.bunVersion");
-  exact(toolchain.typescriptVersion, ts.version, "toolchain.typescriptVersion");
+  exact(toolchain.typescriptVersion, typeScriptManifest.version, "toolchain.typescriptVersion");
   exact(toolchain.platform, process.platform, "toolchain.platform");
   exact(toolchain.architecture, process.arch, "toolchain.architecture");
   exact(

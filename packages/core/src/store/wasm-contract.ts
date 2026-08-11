@@ -195,14 +195,8 @@ export type RecomputingCellStore = CellStore & {
   markCellCleanRevision(sheet: number, row: number, col: number, revision: bigint): boolean;
 };
 
-/** Consuming accessors transfer packed arrays out of one WASM window exactly once. */
+/** Consuming accessors transfer one packed numeric payload and any strings once. */
 export type ConsumingWindowView = WindowView & {
-  takeKinds(): Uint8Array;
-  takeNumbers(): Float64Array;
-  takeStringIndex(): Int32Array;
-  takeStringIds(): Uint32Array;
-  takeStyleIndex(): Uint32Array;
-  takeStyleDict(): Uint32Array;
+  takePacked(): Uint8Array;
   takeStrings(): string[];
-  takeCondMatches(): Uint32Array;
 };
