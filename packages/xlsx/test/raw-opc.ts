@@ -8,7 +8,7 @@ export const TRANSITIONAL_REL =
   "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 export const STRICT_REL = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 
-export interface RawSheet {
+interface RawSheet {
   name?: string;
   xml: string;
   state?: "visible" | "hidden" | "veryHidden";

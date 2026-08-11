@@ -49,7 +49,7 @@ function relationshipSourcePart(part: string): string {
   return `${match[1] ?? ""}${match[2]}`;
 }
 
-export function resolveRelationshipTarget(sourcePart: string, rawTarget: string): string {
+function resolveRelationshipTarget(sourcePart: string, rawTarget: string): string {
   let decoded: string;
   try {
     decoded = decodeURIComponent(rawTarget);

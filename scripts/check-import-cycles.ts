@@ -179,8 +179,6 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     dependencies: ["cell", "coordinates", "document", "transaction"],
     exports: [
       "CellLoadState",
-      "ClipboardFormulaEntry",
-      "ClipboardRefEntry",
       "ClipboardWindowView",
       "PagedStoreStats",
       "QueryCapability",
@@ -224,7 +222,6 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "Grid",
       "GridActions",
       "GridPresentation",
-      "HyperlinkActivationEvent",
       "GridConfig",
       "GridEvents",
       "GridOptions",

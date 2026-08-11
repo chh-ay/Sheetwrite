@@ -6,10 +6,3 @@ export const KIND_BOOL = 3 as const;
 export const KIND_FORMULA = 4 as const;
 
 export const NO_STRING = 0xffffffff as const;
-
-export type CellKindTag =
-  | typeof KIND_EMPTY
-  | typeof KIND_NUMBER
-  | typeof KIND_STRING
-  | typeof KIND_BOOL
-  | typeof KIND_FORMULA;

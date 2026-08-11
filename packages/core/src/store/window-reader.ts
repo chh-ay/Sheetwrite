@@ -136,7 +136,7 @@ export interface PersistedCellView {
 }
 
 /** Exact internal diagnostics attached to each decoded visible-window read. */
-export interface VisibleWindowResourceMetrics {
+interface VisibleWindowResourceMetrics {
   readonly ffiCalls: number;
   readonly ffiBoundaryCalls: number;
   readonly ffiInputBytes: number;

@@ -11,7 +11,7 @@ import type { ResourceOwnerBytes } from "./types/store.js";
 /** Stable internal policy bounds. Prefetch never exceeds either horizon. */
 export const DATASOURCE_PREFETCH_MAX_ROWS = 512;
 export const DATASOURCE_PREFETCH_MAX_BYTES = 512 * 1024;
-export const DATASOURCE_PREFETCH_MAX_BANDS = 2;
+const DATASOURCE_PREFETCH_MAX_BANDS = 2;
 export const DATASOURCE_MAX_ACTIVE_REQUESTS = 6;
 export const DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT = 4_096;
 const DATASOURCE_NO_PROGRESS_RETRIES = 1;

@@ -40,7 +40,7 @@ function utf8Length(value: string): number {
   return bytes;
 }
 
-export function decodeXmlEntities(value: string, part: string): string {
+function decodeXmlEntities(value: string, part: string): string {
   if (!value.includes("&")) return value;
   let output = "";
   let cursor = 0;

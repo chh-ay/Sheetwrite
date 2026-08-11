@@ -112,7 +112,7 @@ export interface RuntimeResourceSnapshot {
   };
 }
 
-export interface ResourceOwnerDelta {
+interface ResourceOwnerDelta {
   readonly owner: string;
   readonly logicalBytes: number;
   readonly allocatedBytes: number;
