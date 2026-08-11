@@ -434,7 +434,7 @@ export interface CellInputSnapshot {
 export type SheetLifecycleResult = ApplyTransactionResult & { readonly sheet: SheetId };
 
 /** Host-safe activation payload emitted only after final target validation. */
-export interface HyperlinkActivationEvent {
+interface HyperlinkActivationEvent {
   readonly address: CellAddress;
   readonly hyperlink: CellHyperlink;
   readonly target: ResolvedHyperlinkTarget;

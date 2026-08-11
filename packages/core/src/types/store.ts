@@ -80,12 +80,12 @@ export interface VisibleWindowView {
   ffiLargestTransferBytes?: number;
 }
 
-export interface ClipboardFormulaEntry {
+interface ClipboardFormulaEntry {
   readonly offset: number;
   readonly source: string;
 }
 
-export interface ClipboardRefEntry {
+interface ClipboardRefEntry {
   readonly offset: number;
   readonly target: CellAddress;
 }

@@ -9,7 +9,7 @@ Create a typed bridge while preserving row and identity inference.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L859</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L858</code></dd></div>
 </dl>
 
 ## Declaration

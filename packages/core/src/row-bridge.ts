@@ -64,8 +64,7 @@ interface RowBridgeDeltaBase<Id extends RowBridgeId = RowBridgeId> {
 }
 
 /** A single-cell edit, including edits from search, undo, and redo. */
-export interface RowBridgeCellDelta<Id extends RowBridgeId = RowBridgeId>
-  extends RowBridgeDeltaBase<Id> {
+interface RowBridgeCellDelta<Id extends RowBridgeId = RowBridgeId> extends RowBridgeDeltaBase<Id> {
   readonly kind: "cell";
   readonly cell: RowBridgeCell<Id>;
 }

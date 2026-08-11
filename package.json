@@ -18,8 +18,9 @@
   },
   "scripts": {
     "api:report": "bun scripts/public-api.ts report",
-    "api:check": "bun scripts/public-api.ts check",
+    "api:check": "bun scripts/public-api.ts check && bun run api:unused:internal",
     "api:unused": "bun scripts/public-api.ts unused",
+    "api:unused:internal": "knip --workspace './packages/*' --include exports,types,nsExports,nsTypes --no-progress",
     "api:baseline": "bun scripts/public-api.ts baseline",
     "compatibility:validate": "bun scripts/conformance/validate-cli.ts",
     "compatibility:check": "bun scripts/conformance.ts offline",
@@ -89,6 +90,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "fake-indexeddb": "6.2.5",
+    "knip": "6.32.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "svelte": "5.56.5",

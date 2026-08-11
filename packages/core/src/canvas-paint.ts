@@ -86,7 +86,7 @@ function mergeRowSpanHeight(
 const columnEdgesCache = new WeakMap<RenderLayout["columns"], number[]>();
 
 /** Cumulative left edges per visible column; `colX[c+1] - colX[c]` is its width. */
-export function columnEdges(layout: RenderLayout): number[] {
+function columnEdges(layout: RenderLayout): number[] {
   const columns = layout.columns;
   const cached = columnEdgesCache.get(columns);
   if (cached !== undefined) return cached;

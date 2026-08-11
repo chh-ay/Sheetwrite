@@ -9,7 +9,7 @@ import type { Theme } from "./types/render.js";
  * identical to the old hardcoded inline styles while remaining fully
  * restylable by host CSS.
  */
-export const WIDGET_THEME_VARS = {
+const WIDGET_THEME_VARS = {
   "--sheetwrite-widget-font": (t: Theme) => t.font,
   "--sheetwrite-widget-bg": (t: Theme) => t.bg,
   "--sheetwrite-widget-fg": (t: Theme) => t.fg,

@@ -5,12 +5,12 @@
 // ── Constants ────────────────────────────────────────────────────────────────
 
 /** Pointer proximity (px) to a boundary that counts as grabbing it. */
-export const RESIZE_THRESHOLD = 4;
+const RESIZE_THRESHOLD = 4;
 /** Floors so a resized column / row never collapses away. */
 export const MIN_COLUMN_WIDTH = 24;
 export const MIN_ROW_HEIGHT = 12;
 /** Left+right text padding baked into an autofit width (matches the paint CELL_PAD * 2). */
-export const AUTOFIT_PADDING = 12;
+const AUTOFIT_PADDING = 12;
 
 // ── Boundary hit-testing ─────────────────────────────────────────────────────
 

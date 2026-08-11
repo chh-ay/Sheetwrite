@@ -21,7 +21,7 @@ export interface FillSourceCell {
  * - `value`: a numeric literal produced by arithmetic extrapolation.
  * - `tile`: copy the source cell at `sourceIndex` (caller resolves value / shifts refs).
  */
-export type FillStep = { kind: "value"; value: number } | { kind: "tile"; sourceIndex: number };
+type FillStep = { kind: "value"; value: number } | { kind: "tile"; sourceIndex: number };
 
 /** A resolved fill plan for a single column. */
 export interface FillSeries {
