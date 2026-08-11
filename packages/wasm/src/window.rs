@@ -564,3 +564,14 @@ impl WindowView {
         std::mem::take(&mut self.strings)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::pack_window;
+
+    #[test]
+    fn packed_window_rejects_mismatched_cell_buffers() {
+        assert!(pack_window(1, 1, &[], &[0.0], &[0], &[0], &[0], &[], &[], 0).is_none());
+        assert!(pack_window(1, 1, &[0], &[0.0], &[0], &[0], &[0], &[], &[0, 0], 0).is_none());
+    }
+}
