@@ -1,5 +1,15 @@
 # @sheetwrite/wasm
 
+## 0.4.0
+
+### Minor Changes
+
+- 41f6749: Pack visible-window numeric, kind, style, string-index, and conditional-format data into one validated transfer buffer, reducing ordinary window reads from seven output allocations to one.
+
+### Patch Changes
+
+- 41f6749: Reuse each visible formula entry while decoding render windows, avoiding redundant formula-map probes without changing resolved values or error precedence.
+
 ## 0.3.1
 
 ### Patch Changes
