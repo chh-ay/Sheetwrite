@@ -5,6 +5,7 @@ import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 const STABLE_VERSION = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const REPOSITORY_ROOT = resolve(import.meta.dir, "..");
 const PACKAGE_SIZE_HISTORY_PREFIX = "automation/package-size-history-";
+const RELEASE_VERSION_PREFIX = "release/version-";
 const REQUIRED_PACKAGE_SIZE_HISTORY_FILES = new Set([
   "docs/src/content/docs/guides/performance-resources.md",
   "scripts/size-history.json",
@@ -32,7 +33,11 @@ export function changesetComparisonFromBaseRef(
 }
 
 export function releaseVersionFromHeadRef(headRef: string | undefined): string | undefined {
-  return headRef !== undefined && STABLE_VERSION.test(headRef) ? headRef : undefined;
+  if (headRef === undefined) return undefined;
+  const candidate = headRef.startsWith(RELEASE_VERSION_PREFIX)
+    ? headRef.slice(RELEASE_VERSION_PREFIX.length)
+    : headRef;
+  return STABLE_VERSION.test(candidate) ? candidate : undefined;
 }
 export function packageSizeHistoryVersionFromHeadRef(
   headRef: string | undefined,

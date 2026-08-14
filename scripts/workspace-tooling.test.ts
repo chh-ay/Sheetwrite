@@ -250,6 +250,7 @@ describe("changeset workspace contract", () => {
 
   it("runs the release-aware Changesets status command", () => {
     expect(releaseVersionFromHeadRef("0.3.1")).toBe("0.3.1");
+    expect(releaseVersionFromHeadRef("release/version-0.4.0")).toBe("0.4.0");
     expect(releaseVersionFromHeadRef("feature/docs")).toBeUndefined();
     expect(packageSizeHistoryVersionFromHeadRef("automation/package-size-history-0.3.1")).toBe(
       "0.3.1",
