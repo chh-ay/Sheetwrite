@@ -25,7 +25,7 @@
     },
     "bench": {
       "name": "@sheetwrite/bench",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
         "@sheetwrite/wasm": "workspace:*",
@@ -40,7 +40,7 @@
     },
     "docs": {
       "name": "@sheetwrite/docs-start",
-      "version": "0.0.1",
+      "version": "0.0.2",
       "dependencies": {
         "@base-ui/react": "^1.6.0",
         "@floating-ui/dom": "^1.8.0",
@@ -96,14 +96,14 @@
     },
     "packages/core": {
       "name": "@sheetwrite/core",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "dependencies": {
         "@sheetwrite/wasm": "workspace:*",
       },
     },
     "packages/react": {
       "name": "@sheetwrite/react",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -113,7 +113,7 @@
     },
     "packages/svelte": {
       "name": "@sheetwrite/svelte",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -127,7 +127,7 @@
     },
     "packages/vue": {
       "name": "@sheetwrite/vue",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
       },
@@ -137,11 +137,11 @@
     },
     "packages/wasm": {
       "name": "@sheetwrite/wasm",
-      "version": "0.3.1",
+      "version": "0.4.0",
     },
     "packages/xlsx": {
       "name": "@sheetwrite/xlsx",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "dependencies": {
         "@sheetwrite/core": "workspace:*",
         "fflate": "0.8.3",
@@ -152,6 +152,7 @@
     "@biomejs/biome",
   ],
   "overrides": {
+    "nanoid": "3.3.18",
     "postcss": "^8.5.18",
   },
   "packages": {
@@ -1195,7 +1196,7 @@
 
     "muggle-string": ["muggle-string@0.4.1", "", {}, "sha512-VNTrAak/KhO2i8dqqnqnAHOa3cYBwXEZe9h+D5h/1ZqFSTEFHdM65lR7RoIqq3tBBYavsOXV84NoHXZ0AkPyqQ=="],
 
-    "nanoid": ["nanoid@3.3.17", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-xQLf0A3HOMlgHq0n247/LRuAOYmB7dXJ/DvAxGvsSBij45XtBSmQycu+F8ODbHwns/XyFZagyL1+J0Offw1E0g=="],
+    "nanoid": ["nanoid@3.3.18", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-DTg4MJbGMWkfi6VZFdNt2/caMbQy4Ou+Op/hJQvGEWcnVfoA1QA+xzRKAzw9jD6+GVOOeYr/mIcuDSdug6F6+w=="],
 
     "node-releases": ["node-releases@2.0.51", "", {}, "sha512-wRNIrw4DmVLKQlbgOMdkMx27Wrpzes2hh5Jtbi2bjPd+4wJstWIqP5A+lscnqbm0xxmT5Bpg8Lec5ItEBwx6BQ=="],
 

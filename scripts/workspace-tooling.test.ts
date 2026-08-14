@@ -285,18 +285,18 @@ describe("changeset workspace contract", () => {
         "scripts/size-history.json",
       ]),
     ).toBeFalse();
-    expect(() => validateReleasePackageVersions("0.3.1")).not.toThrow();
-    expect(() => validateReleasePackageVersions("0.3.2")).toThrow(
-      "Release branch 0.3.2 requires @sheetwrite/wasm@0.3.2",
+    expect(() => validateReleasePackageVersions("0.4.0")).not.toThrow();
+    expect(() => validateReleasePackageVersions("0.4.1")).toThrow(
+      "Release branch 0.4.1 requires @sheetwrite/wasm@0.4.1",
     );
     const root = resolve(import.meta.dir, "..");
     const result = Bun.spawnSync(["bun", "run", "changeset:ci"], {
       cwd: root,
-      env: { ...process.env, GITHUB_HEAD_REF: "0.3.1" },
+      env: { ...process.env, GITHUB_HEAD_REF: "0.4.0" },
       stderr: "pipe",
       stdout: "pipe",
     });
     expect(result.exitCode, result.stderr.toString()).toBe(0);
-    expect(result.stdout.toString()).toContain("Release package versions match branch 0.3.1");
+    expect(result.stdout.toString()).toContain("Release package versions match branch 0.4.0");
   });
 });
