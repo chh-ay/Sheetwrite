@@ -1,5 +1,26 @@
 # @sheetwrite/vue
 
+## 0.4.0
+
+### Minor Changes
+
+- Align the framework adapters and XLSX integration with the coordinated Sheetwrite 0.4.0 release.
+
+### Patch Changes
+
+- Updated dependencies [8457eca]
+- Updated dependencies [dac694a]
+- Updated dependencies [0e09ecc]
+- Updated dependencies [41f6749]
+- Updated dependencies [41f6749]
+- Updated dependencies [41f6749]
+- Updated dependencies [41f6749]
+- Updated dependencies [55b1f35]
+- Updated dependencies [b225783]
+- Updated dependencies [41f6749]
+- Updated dependencies [ce1e404]
+  - @sheetwrite/core@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes

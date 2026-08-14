@@ -9,10 +9,10 @@ Result of module initialization: the instantiated exports plus the shared linear
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/wasm</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L411</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/wasm/pkg/sheetwrite_wasm.d.ts#L386</code></dd></div>
 </dl>
 
-## Members <span class="api-count" data-pagefind-ignore>134</span>
+## Members <span class="api-count" data-pagefind-ignore>128</span>
 
 <div class="api-member-list">
 
@@ -1078,42 +1078,6 @@ readonly windowview_nCols: (a: number) => number;
 
 </details>
 
-<details class="api-member" id="init-output-windowview-n-rows" data-pagefind-weight="1">
-<summary><code>windowview_nRows</code></summary>
-
-```ts generated
-readonly windowview_nRows: (a: number) => number;
-```
-
-</details>
-
-<details class="api-member" id="init-output-windowview-take-cond-matches" data-pagefind-weight="1">
-<summary><code>windowview_takeCondMatches</code></summary>
-
-```ts generated
-readonly windowview_takeCondMatches: (a: number) => [number, number];
-```
-
-</details>
-
-<details class="api-member" id="init-output-windowview-take-string-ids" data-pagefind-weight="1">
-<summary><code>windowview_takeStringIds</code></summary>
-
-```ts generated
-readonly windowview_takeStringIds: (a: number) => [number, number];
-```
-
-</details>
-
-<details class="api-member" id="init-output-windowview-take-string-index" data-pagefind-weight="1">
-<summary><code>windowview_takeStringIndex</code></summary>
-
-```ts generated
-readonly windowview_takeStringIndex: (a: number) => [number, number];
-```
-
-</details>
-
 <details class="api-member" id="init-output-windowview-take-strings" data-pagefind-weight="1">
 <summary><code>windowview_takeStrings</code></summary>
 
@@ -1123,38 +1087,20 @@ readonly windowview_takeStrings: (a: number) => [number, number];
 
 </details>
 
-<details class="api-member" id="init-output-windowview-take-style-dict" data-pagefind-weight="1">
-<summary><code>windowview_takeStyleDict</code></summary>
+<details class="api-member" id="init-output-windowview-take-packed" data-pagefind-weight="1">
+<summary><code>windowview_takePacked</code></summary>
 
 ```ts generated
-readonly windowview_takeStyleDict: (a: number) => [number, number];
+readonly windowview_takePacked: (a: number) => [number, number];
 ```
 
 </details>
 
-<details class="api-member" id="init-output-windowview-take-style-index" data-pagefind-weight="1">
-<summary><code>windowview_takeStyleIndex</code></summary>
+<details class="api-member" id="init-output-windowview-n-rows" data-pagefind-weight="1">
+<summary><code>windowview_nRows</code></summary>
 
 ```ts generated
-readonly windowview_takeStyleIndex: (a: number) => [number, number];
-```
-
-</details>
-
-<details class="api-member" id="init-output-windowview-take-kinds" data-pagefind-weight="1">
-<summary><code>windowview_takeKinds</code></summary>
-
-```ts generated
-readonly windowview_takeKinds: (a: number) => [number, number];
-```
-
-</details>
-
-<details class="api-member" id="init-output-windowview-take-numbers" data-pagefind-weight="1">
-<summary><code>windowview_takeNumbers</code></summary>
-
-```ts generated
-readonly windowview_takeNumbers: (a: number) => [number, number];
+readonly windowview_nRows: (a: number) => number;
 ```
 
 </details>
@@ -1832,15 +1778,9 @@ export interface InitOutput {
   readonly sourcesnapshot_referenceTargets: (a: number) => [number, number];
   readonly sourcesnapshot_spillDerived: (a: number) => [number, number];
   readonly windowview_nCols: (a: number) => number;
-  readonly windowview_nRows: (a: number) => number;
-  readonly windowview_takeCondMatches: (a: number) => [number, number];
-  readonly windowview_takeStringIds: (a: number) => [number, number];
-  readonly windowview_takeStringIndex: (a: number) => [number, number];
   readonly windowview_takeStrings: (a: number) => [number, number];
-  readonly windowview_takeStyleDict: (a: number) => [number, number];
-  readonly windowview_takeStyleIndex: (a: number) => [number, number];
-  readonly windowview_takeKinds: (a: number) => [number, number];
-  readonly windowview_takeNumbers: (a: number) => [number, number];
+  readonly windowview_takePacked: (a: number) => [number, number];
+  readonly windowview_nRows: (a: number) => number;
   readonly __wbindgen_malloc: (a: number, b: number) => number;
   readonly __wbindgen_realloc: (
     a: number,

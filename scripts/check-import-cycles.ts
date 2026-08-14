@@ -37,6 +37,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/store.ts",
   ],
   "wasm-contract.ts": [],
+  "wire-tags.ts": [],
   "window-reader.ts": [
     "../style-dictionary.ts",
     "../types/cell.ts",
@@ -44,6 +45,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/document.ts",
     "../types/store.ts",
     "wasm-contract.ts",
+    "wire-tags.ts",
   ],
 };
 
@@ -177,8 +179,6 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
     dependencies: ["cell", "coordinates", "document", "transaction"],
     exports: [
       "CellLoadState",
-      "ClipboardFormulaEntry",
-      "ClipboardRefEntry",
       "ClipboardWindowView",
       "PagedStoreStats",
       "QueryCapability",
@@ -222,7 +222,6 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "Grid",
       "GridActions",
       "GridPresentation",
-      "HyperlinkActivationEvent",
       "GridConfig",
       "GridEvents",
       "GridOptions",

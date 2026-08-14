@@ -70,6 +70,50 @@ async function canvasBodyPainted(page: Page): Promise<boolean> {
   return hasOpaqueForeground(rgba);
 }
 
+interface DprCanvasEvidence {
+  backingHeight: number;
+  backingWidth: number;
+  cssHeight: number;
+  cssWidth: number;
+  devicePixelRatio: number;
+  sample: number[];
+  sampleHeight: number;
+  sampleWidth: number;
+}
+
+async function readDprCanvasEvidence(page: Page): Promise<DprCanvasEvidence> {
+  return page.locator(CANVAS).evaluate((element) => {
+    const canvas = element as HTMLCanvasElement;
+    const context = canvas.getContext("2d");
+    const bounds = canvas.getBoundingClientRect();
+    if (!context) throw new Error("Main-thread canvas 2D context is unavailable");
+    if (bounds.width <= 0 || bounds.height <= 0) {
+      throw new Error("Main-thread canvas has no CSS dimensions");
+    }
+
+    const scaleX = canvas.width / bounds.width;
+    const scaleY = canvas.height / bounds.height;
+    const left = Math.ceil(64 * scaleX);
+    const top = Math.ceil(40 * scaleY);
+    const sampleWidth = Math.min(Math.ceil(256 * scaleX), canvas.width - left);
+    const sampleHeight = Math.min(Math.ceil(160 * scaleY), canvas.height - top);
+    if (sampleWidth <= 0 || sampleHeight <= 0) {
+      throw new Error("Main-thread canvas body sample is empty");
+    }
+
+    return {
+      backingHeight: canvas.height,
+      backingWidth: canvas.width,
+      cssHeight: bounds.height,
+      cssWidth: bounds.width,
+      devicePixelRatio: window.devicePixelRatio,
+      sample: Array.from(context.getImageData(left, top, sampleWidth, sampleHeight).data),
+      sampleHeight,
+      sampleWidth,
+    };
+  });
+}
+
 async function waitForLive(page: Page): Promise<void> {
   await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
     timeout: 20_000,
@@ -170,6 +214,94 @@ test("boots product-first, paints, and exposes the ownership instruments", async
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
+
+test(
+  "main-thread production canvas paints cells in a DPR 2 backing store",
+  {
+    tag: "@dpr2-render",
+  },
+  async ({ browser, browserName, page }, testInfo) => {
+    const errors = collectErrors(page);
+    await page.goto(`${VANILLA_URL}?renderer=canvas`);
+    await waitForLive(page);
+    await expect(page.getByTestId("renderer")).toContainText(
+      "Requested: Main thread · Active: Main thread",
+    );
+    await expect
+      .poll(async () => hasOpaqueForeground((await readDprCanvasEvidence(page)).sample), {
+        timeout: 15_000,
+        message: "DPR 2 main-thread canvas body never painted cell foreground",
+      })
+      .toBe(true);
+
+    const evidence = await readDprCanvasEvidence(page);
+    const visibleCells = await gridCellTexts(page);
+    const runtimeIdentity = await page.evaluate(() => ({
+      navigatorPlatform: navigator.platform,
+      userAgent: navigator.userAgent,
+      vendor: navigator.vendor,
+    }));
+    const opaqueColors = new Set<string>();
+    let opaquePixels = 0;
+    for (let offset = 0; offset + 3 < evidence.sample.length; offset += 4) {
+      if (evidence.sample[offset + 3] !== 255) continue;
+      opaquePixels += 1;
+      opaqueColors.add(
+        `${evidence.sample[offset]},${evidence.sample[offset + 1]},${evidence.sample[offset + 2]}`,
+      );
+    }
+    const expectedBackingWidth = Math.max(1, Math.round(evidence.cssWidth * 2));
+    const expectedBackingHeight = Math.max(1, Math.round(evidence.cssHeight * 2));
+    const renderEvidence = {
+      automation: {
+        browserEngine: browserName,
+        browserVersion: browser.version(),
+        hostPlatform: `${process.platform}-${process.arch}`,
+        project: testInfo.project.name,
+        projectMetadata: testInfo.project.metadata,
+        ...runtimeIdentity,
+      },
+      canvas: {
+        backingHeight: evidence.backingHeight,
+        backingWidth: evidence.backingWidth,
+        cssHeight: evidence.cssHeight,
+        cssWidth: evidence.cssWidth,
+        devicePixelRatio: evidence.devicePixelRatio,
+        expectedBackingHeight,
+        expectedBackingWidth,
+      },
+      cells: {
+        expectedVisibleValue: FIRST_ACCOUNT,
+        foregroundPainted: hasOpaqueForeground(evidence.sample),
+        opaqueColorCount: opaqueColors.size,
+        opaquePixels,
+        sampleHeight: evidence.sampleHeight,
+        sampleWidth: evidence.sampleWidth,
+      },
+    };
+    await testInfo.attach("dpr2-main-thread-render-evidence", {
+      body: Buffer.from(JSON.stringify(renderEvidence, null, 2)),
+      contentType: "application/json",
+    });
+
+    expect(["chromium", "webkit"]).toContain(browserName);
+    expect(testInfo.project.name).toBe(`${browserName}-engine-dpr2`);
+    expect(testInfo.project.metadata).toMatchObject({
+      automationEngine:
+        browserName === "chromium" ? "Playwright Chromium" : "Playwright WebKit (not macOS Safari)",
+      hostPlatform: `${process.platform}-${process.arch}`,
+      nativeMacOSSafariHardwareVerification: "external",
+    });
+    expect(evidence.devicePixelRatio).toBe(2);
+    expect(evidence.backingWidth).toBe(expectedBackingWidth);
+    expect(evidence.backingHeight).toBe(expectedBackingHeight);
+    expect(hasOpaqueForeground(evidence.sample)).toBe(true);
+    expect(visibleCells).toContain(FIRST_ACCOUNT);
+    expect(errors.page).toEqual([]);
+    expect(errors.worker).toEqual([]);
+    expect(errors.console).toEqual([]);
+  },
+);
 
 test("scenario tabs support keyboard focus and drive real construction options", async ({
   page,
@@ -294,6 +426,190 @@ test("renderer selection is construction-bound and deep-linked", {
     .poll(() => page.workers().length, { message: "Worker survived renderer teardown" })
     .toBe(0);
 
+  expect(errors.page).toEqual([]);
+  expect(errors.worker).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
+test("DPR-only changes repaint both main-thread and Worker canvases", {
+  tag: "@portability",
+}, async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.addInitScript(() => {
+    const nativeMatchMedia = window.matchMedia.bind(window);
+    const resolutionQueries = new Set<MediaQueryList>();
+    let dpr = 1;
+
+    Object.defineProperty(window, "devicePixelRatio", {
+      configurable: true,
+      get: () => dpr,
+    });
+    window.matchMedia = ((media: string): MediaQueryList => {
+      if (!media.startsWith("(resolution: ")) return nativeMatchMedia(media);
+
+      const target = new EventTarget();
+      Object.defineProperties(target, {
+        matches: {
+          configurable: true,
+          get: () => media === `(resolution: ${dpr}dppx)`,
+        },
+        media: { configurable: true, value: media },
+        onchange: { configurable: true, writable: true, value: null },
+      });
+      Object.assign(target, {
+        addListener(listener: EventListener): void {
+          target.addEventListener("change", listener);
+        },
+        removeListener(listener: EventListener): void {
+          target.removeEventListener("change", listener);
+        },
+      });
+      const query = target as MediaQueryList;
+      resolutionQueries.add(query);
+      return query;
+    }) as typeof window.matchMedia;
+    Object.defineProperty(window, "__sheetwriteSetDpr", {
+      configurable: true,
+      value: (next: number): void => {
+        dpr = next;
+        for (const query of Array.from(resolutionQueries)) {
+          if (!query.matches) query.dispatchEvent(new Event("change"));
+        }
+      },
+    });
+  });
+
+  await page.goto(VANILLA_URL);
+  await waitForLive(page);
+  const canvas = page.locator(CANVAS);
+  const backingScale = () =>
+    canvas.evaluate((element) => {
+      const node = element as HTMLCanvasElement;
+      return node.width / node.getBoundingClientRect().width;
+    });
+  await expect.poll(backingScale).toBeCloseTo(1, 1);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __sheetwriteSetDpr: (next: number) => void;
+      }
+    ).__sheetwriteSetDpr(2);
+  });
+  await expect.poll(backingScale).toBeCloseTo(2, 1);
+  await expect.poll(() => canvasBodyPainted(page)).toBe(true);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __sheetwriteSetDpr: (next: number) => void;
+      }
+    ).__sheetwriteSetDpr(1);
+  });
+  await expect.poll(backingScale).toBeCloseTo(1, 1);
+
+  await page.getByRole("radio", { name: "Web Worker" }).click();
+  await expect(page.getByTestId("renderer")).toContainText(
+    "Requested: Web Worker · Active: Web Worker",
+    { timeout: 20_000 },
+  );
+  await expect(page.getByTestId("renderer")).toHaveAttribute("data-fallback-count", "0");
+  await expect
+    .poll(async () => Number((await canvas.getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker never acknowledged its initial frame",
+    })
+    .toBeGreaterThan(0);
+  const firstWorkerFrame = Number((await canvas.getAttribute("data-worker-frame")) ?? 0);
+
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __sheetwriteSetDpr: (next: number) => void;
+      }
+    ).__sheetwriteSetDpr(2);
+  });
+  await expect
+    .poll(async () => Number((await canvas.getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker did not repaint after the DPR-only change",
+    })
+    .toBeGreaterThan(firstWorkerFrame);
+  await expect.poll(() => canvasBodyPainted(page)).toBe(true);
+
+  const secondWorkerFrame = Number((await canvas.getAttribute("data-worker-frame")) ?? 0);
+  await page.evaluate(() => {
+    (
+      window as typeof window & {
+        __sheetwriteSetDpr: (next: number) => void;
+      }
+    ).__sheetwriteSetDpr(1);
+  });
+  await expect
+    .poll(async () => Number((await canvas.getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker did not repaint after the rearmed DPR query changed",
+    })
+    .toBeGreaterThan(secondWorkerFrame);
+
+  expect(errors.page).toEqual([]);
+  expect(errors.worker).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
+test("worker repaint keeps a cached non-shared view painted after a sub-row scroll", {
+  tag: "@portability",
+}, async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto(`${VANILLA_URL}?renderer=worker`);
+  await waitForLive(page);
+  await expect(page.getByTestId("renderer")).toContainText(
+    "Requested: Web Worker · Active: Web Worker",
+    { timeout: 20_000 },
+  );
+  await expect(page.getByTestId("renderer")).toHaveAttribute("data-fallback-count", "0");
+  await expect
+    .poll(async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker never acknowledged the initial frame",
+    })
+    .toBeGreaterThan(0);
+  await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
+  expect(await page.evaluate(() => globalThis.crossOriginIsolated)).toBe(false);
+
+  const scroller = page.locator(`${GRID} .sheetwrite-scroller`);
+  await scroller.hover();
+  const initialFrame = Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0);
+  await page.mouse.wheel(0, 8);
+  await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect
+    .poll(async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker did not paint the first sub-row scroll",
+    })
+    .toBeGreaterThan(initialFrame);
+
+  const frameBeforeCachedPaint = Number(
+    (await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0,
+  );
+  const cellsBeforeCachedPaint = await gridCellTexts(page);
+  const scrollBeforeCachedPaint = await scroller.evaluate((element) => element.scrollTop);
+  await page.mouse.wheel(0, 8);
+  await expect
+    .poll(() => scroller.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(scrollBeforeCachedPaint);
+  const scrollAfterCachedPaint = await scroller.evaluate((element) => element.scrollTop);
+  expect(scrollAfterCachedPaint - scrollBeforeCachedPaint).toBeLessThan(20);
+  // The second fractional scroll stays inside the same row window, so the data
+  // signature and visible cells stay fixed while another Worker frame paints.
+  expect(await gridCellTexts(page)).toEqual(cellsBeforeCachedPaint);
+  await expect
+    .poll(async () => Number((await page.locator(CANVAS).getAttribute("data-worker-frame")) ?? 0), {
+      timeout: 20_000,
+      message: "Worker did not repaint the cached view after a sub-row scroll",
+    })
+    .toBeGreaterThan(frameBeforeCachedPaint);
+  await expect.poll(() => canvasBodyPainted(page), { timeout: 20_000 }).toBe(true);
   expect(errors.page).toEqual([]);
   expect(errors.worker).toEqual([]);
   expect(errors.console).toEqual([]);

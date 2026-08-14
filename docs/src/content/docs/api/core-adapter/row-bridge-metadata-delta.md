@@ -9,7 +9,7 @@ A document operation that changes workbook or column metadata.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core/adapter</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L120</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L119</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>9</span>

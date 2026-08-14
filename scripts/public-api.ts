@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, readdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, readdir, readFile, rename, writeFile } from "node:fs/promises";
 import { join, relative, resolve, sep } from "node:path";
 import * as ts from "typescript-compiler";
 import { PUBLIC_TYPE_DOMAINS } from "./check-import-cycles.js";
@@ -54,6 +54,7 @@ export interface ApiIssue {
     | "unclassified-entry"
     | "wrong-owner"
     | "unstable-error-contract"
+    | "unused-export"
     | "unresolved-entry";
   message: string;
   package?: string;
@@ -809,13 +810,36 @@ export function validateManifest(value: unknown): ApiIssue[] {
   }
   return [];
 }
+export interface PublicApiBaselineEntry {
+  package: string;
+  entryPoint: string;
+  exports: string[];
+}
+
 export interface PublicApiBaseline {
-  schemaVersion: 1;
+  schemaVersion: 2;
   manifestFormatVersion: PublicApiManifest["formatVersion"];
   sha256: string;
+  /** Reviewed public intent; baseline refreshes preserve this list rather than accepting new exports. */
+  intentionalExports: PublicApiBaselineEntry[];
 }
 
 const PUBLIC_API_BASELINE_PATH = "scripts/public-api-baseline.json";
+const SOURCE_FILE_PATTERN = /\.(?:[cm]?[jt]sx?|svelte|vue)$/;
+const IGNORED_SOURCE_DIRECTORIES: Readonly<Record<string, true>> = {
+  ".astro": true,
+  ".git": true,
+  ".vercel": true,
+  coverage: true,
+  dist: true,
+  node_modules: true,
+  pkg: true,
+  target: true,
+};
+
+function publicApiEntryKey(packageName: string, entryPoint: string): string {
+  return `${packageName}\0${entryPoint}`;
+}
 
 export function publicApiDigest(manifest: PublicApiManifest): string {
   return createHash("sha256").update(JSON.stringify(manifest)).digest("hex");
@@ -826,19 +850,47 @@ export function parsePublicApiBaseline(value: unknown): PublicApiBaseline {
     typeof value !== "object" ||
     value === null ||
     !("schemaVersion" in value) ||
-    value.schemaVersion !== 1 ||
+    value.schemaVersion !== 2 ||
     !("manifestFormatVersion" in value) ||
     value.manifestFormatVersion !== 2 ||
     !("sha256" in value) ||
     typeof value.sha256 !== "string" ||
-    !/^[0-9a-f]{64}$/.test(value.sha256)
+    !/^[0-9a-f]{64}$/.test(value.sha256) ||
+    !("intentionalExports" in value) ||
+    !Array.isArray(value.intentionalExports)
   ) {
     throw new TypeError("Invalid public API baseline artifact");
   }
+  const entries: PublicApiBaselineEntry[] = [];
+  for (const entry of value.intentionalExports) {
+    if (
+      typeof entry !== "object" ||
+      entry === null ||
+      !("package" in entry) ||
+      typeof entry.package !== "string" ||
+      !("entryPoint" in entry) ||
+      typeof entry.entryPoint !== "string" ||
+      !("exports" in entry) ||
+      !Array.isArray(entry.exports) ||
+      entry.exports.some((name: unknown) => typeof name !== "string")
+    ) {
+      throw new TypeError("Invalid public API baseline artifact");
+    }
+    const names = entry.exports as string[];
+    if (new Set(names).size !== names.length || names.join("\0") !== [...names].sort().join("\0")) {
+      throw new TypeError("Invalid public API baseline artifact");
+    }
+    entries.push({ package: entry.package, entryPoint: entry.entryPoint, exports: [...names] });
+  }
+  const keys = entries.map((entry) => publicApiEntryKey(entry.package, entry.entryPoint));
+  if (new Set(keys).size !== keys.length || keys.join("\0") !== [...keys].sort().join("\0")) {
+    throw new TypeError("Invalid public API baseline artifact");
+  }
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     manifestFormatVersion: 2,
     sha256: value.sha256,
+    intentionalExports: entries,
   };
 }
 
@@ -851,14 +903,14 @@ export async function writePublicApiBaseline(
   repositoryRoot: string,
   manifest: PublicApiManifest,
 ): Promise<PublicApiBaseline> {
+  const previous = await readPublicApiBaseline(repositoryRoot);
   const baseline: PublicApiBaseline = {
-    schemaVersion: 1,
+    ...previous,
     manifestFormatVersion: manifest.formatVersion,
     sha256: publicApiDigest(manifest),
   };
   const path = join(repositoryRoot, PUBLIC_API_BASELINE_PATH);
   const temporaryPath = `${path}.tmp`;
-  await mkdir(join(path, ".."), { recursive: true });
   await writeFile(temporaryPath, `${JSON.stringify(baseline, null, 2)}\n`);
   await rename(temporaryPath, path);
   return baseline;
@@ -874,6 +926,246 @@ export function checkManifestBaseline(manifest: PublicApiManifest, expected: str
           message: `Public API manifest digest changed: expected ${expected}, received ${actual}`,
         },
       ];
+}
+
+async function sourceFiles(directory: string): Promise<string[]> {
+  const files: string[] = [];
+  const entries = await readdir(directory, { withFileTypes: true });
+  entries.sort((left, right) => left.name.localeCompare(right.name));
+  for (const entry of entries) {
+    if (entry.isDirectory() && IGNORED_SOURCE_DIRECTORIES[entry.name] === true) continue;
+    const path = join(directory, entry.name);
+    if (entry.isDirectory()) files.push(...(await sourceFiles(path)));
+    else if (entry.isFile() && SOURCE_FILE_PATTERN.test(entry.name)) files.push(path);
+  }
+  return files;
+}
+
+function scriptFragments(path: string, source: string): string[] {
+  if (!/\.(?:svelte|vue)$/.test(path)) return [source];
+  return [...source.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map(
+    (match) => match[1] ?? "",
+  );
+}
+
+function collectImportedNames(
+  sourceFile: ts.SourceFile,
+  specifiers: ReadonlyMap<string, string>,
+  consumed: Map<string, Set<string>>,
+): void {
+  const record = (specifier: string, name: string): void => {
+    const key = specifiers.get(specifier);
+    if (key === undefined) return;
+    const names = consumed.get(key) ?? new Set<string>();
+    names.add(name);
+    consumed.set(key, names);
+  };
+  const namespaceSpecifiers = new Map<string, string>();
+  const dynamicImportSpecifier = (expression: ts.Expression): string | undefined => {
+    let current = expression;
+    while (ts.isAwaitExpression(current) || ts.isParenthesizedExpression(current)) {
+      current = current.expression;
+    }
+    if (!ts.isCallExpression(current) || current.expression.kind !== ts.SyntaxKind.ImportKeyword) {
+      return undefined;
+    }
+    const argument = current.arguments[0];
+    return current.arguments.length === 1 && argument !== undefined && ts.isStringLiteral(argument)
+      ? argument.text
+      : undefined;
+  };
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isImportDeclaration(node) &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      node.importClause !== undefined
+    ) {
+      const specifier = node.moduleSpecifier.text;
+      if (node.importClause.name !== undefined) record(specifier, "default");
+      const bindings = node.importClause.namedBindings;
+      if (bindings !== undefined) {
+        if (ts.isNamespaceImport(bindings)) {
+          namespaceSpecifiers.set(bindings.name.text, specifier);
+        } else {
+          for (const element of bindings.elements) {
+            record(specifier, element.propertyName?.text ?? element.name.text);
+          }
+        }
+      }
+    } else if (
+      ts.isExportDeclaration(node) &&
+      node.moduleSpecifier !== undefined &&
+      ts.isStringLiteral(node.moduleSpecifier) &&
+      node.exportClause !== undefined &&
+      ts.isNamedExports(node.exportClause)
+    ) {
+      const specifier = node.moduleSpecifier.text;
+      for (const element of node.exportClause.elements) {
+        record(specifier, element.propertyName?.text ?? element.name.text);
+      }
+    } else if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+      const dynamicSpecifier = dynamicImportSpecifier(node.initializer);
+      if (dynamicSpecifier !== undefined) {
+        if (ts.isIdentifier(node.name)) {
+          namespaceSpecifiers.set(node.name.text, dynamicSpecifier);
+        } else if (ts.isObjectBindingPattern(node.name)) {
+          for (const element of node.name.elements) {
+            const importedName = element.propertyName ?? element.name;
+            if (ts.isIdentifier(importedName) || ts.isStringLiteral(importedName)) {
+              record(dynamicSpecifier, importedName.text);
+            }
+          }
+        }
+      } else if (
+        ts.isObjectBindingPattern(node.name) &&
+        ts.isIdentifier(node.initializer) &&
+        namespaceSpecifiers.has(node.initializer.text)
+      ) {
+        const specifier = namespaceSpecifiers.get(node.initializer.text) ?? "";
+        for (const element of node.name.elements) {
+          const importedName = element.propertyName ?? element.name;
+          if (ts.isIdentifier(importedName) || ts.isStringLiteral(importedName)) {
+            record(specifier, importedName.text);
+          }
+        }
+      }
+    } else if (ts.isPropertyAccessExpression(node)) {
+      const dynamicSpecifier = dynamicImportSpecifier(node.expression);
+      if (dynamicSpecifier !== undefined) {
+        record(dynamicSpecifier, node.name.text);
+      } else if (ts.isIdentifier(node.expression)) {
+        record(namespaceSpecifiers.get(node.expression.text) ?? "", node.name.text);
+      }
+    } else if (
+      ts.isElementAccessExpression(node) &&
+      node.argumentExpression !== undefined &&
+      ts.isStringLiteral(node.argumentExpression)
+    ) {
+      const dynamicSpecifier = dynamicImportSpecifier(node.expression);
+      if (dynamicSpecifier !== undefined) {
+        record(dynamicSpecifier, node.argumentExpression.text);
+      } else if (ts.isIdentifier(node.expression)) {
+        record(namespaceSpecifiers.get(node.expression.text) ?? "", node.argumentExpression.text);
+      }
+    } else if (
+      ts.isQualifiedName(node) &&
+      ts.isIdentifier(node.left) &&
+      namespaceSpecifiers.has(node.left.text)
+    ) {
+      record(namespaceSpecifiers.get(node.left.text) ?? "", node.right.text);
+    } else if (
+      ts.isImportTypeNode(node) &&
+      ts.isLiteralTypeNode(node.argument) &&
+      ts.isStringLiteral(node.argument.literal) &&
+      node.qualifier !== undefined
+    ) {
+      record(node.argument.literal.text, node.qualifier.getText(sourceFile).split(".")[0] ?? "");
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+}
+
+async function crossWorkspaceConsumers(
+  repositoryRoot: string,
+  manifest: PublicApiManifest,
+): Promise<Map<string, Set<string>>> {
+  const packageRoots = await packageDirectories(repositoryRoot);
+  const packageWorkspaces = await Promise.all(
+    packageRoots.map(async (root) => ({
+      root,
+      manifest: await readJson<PackageJson>(join(root, "package.json")),
+    })),
+  );
+  const owningRoots = new Map(
+    packageWorkspaces
+      .filter(
+        (workspace): workspace is { root: string; manifest: PackageJson & { name: string } } =>
+          workspace.manifest.name !== undefined,
+      )
+      .map((workspace) => [workspace.manifest.name, workspace.root]),
+  );
+  const explicitConsumerRoots = await Promise.all(
+    ["bench", "docs", "scripts", "test"].map(async (directory) => {
+      const path = join(repositoryRoot, directory);
+      return (await exists(path)) ? path : undefined;
+    }),
+  );
+  const consumerRoots = [...new Set([...packageRoots, ...explicitConsumerRoots])].filter(
+    (root): root is string => root !== undefined,
+  );
+  const consumed = new Map<string, Set<string>>();
+  for (const consumerRoot of consumerRoots) {
+    const specifiers = new Map<string, string>();
+    for (const pkg of manifest.packages) {
+      if (owningRoots.get(pkg.name) === consumerRoot) continue;
+      for (const entry of pkg.entryPoints) {
+        if (entry.kind !== "typescript") continue;
+        specifiers.set(
+          entry.subpath === "." ? pkg.name : `${pkg.name}/${entry.subpath.slice(2)}`,
+          publicApiEntryKey(pkg.name, entry.subpath),
+        );
+      }
+    }
+    if (specifiers.size === 0) continue;
+    for (const path of await sourceFiles(consumerRoot)) {
+      const source = await readFile(path, "utf8");
+      for (const fragment of scriptFragments(path, source)) {
+        const sourceFile = ts.createSourceFile(
+          path,
+          fragment,
+          ts.ScriptTarget.Latest,
+          true,
+          ts.ScriptKind.TSX,
+        );
+        collectImportedNames(sourceFile, specifiers, consumed);
+      }
+    }
+  }
+  return consumed;
+}
+
+export async function findUnusedPublicExports(
+  repositoryRoot: string,
+  manifest: PublicApiManifest,
+  baseline: PublicApiBaseline,
+): Promise<ApiIssue[]> {
+  const intended = new Map(
+    baseline.intentionalExports.map((entry) => [
+      publicApiEntryKey(entry.package, entry.entryPoint),
+      new Set(entry.exports),
+    ]),
+  );
+  const consumed = await crossWorkspaceConsumers(repositoryRoot, manifest);
+  const issues: ApiIssue[] = [];
+  for (const pkg of manifest.packages) {
+    for (const entry of pkg.entryPoints) {
+      if (entry.kind !== "typescript") continue;
+      const key = publicApiEntryKey(pkg.name, entry.subpath);
+      const intentionalNames = intended.get(key);
+      const consumedNames = consumed.get(key);
+      for (const apiExport of entry.exports) {
+        if (
+          intentionalNames?.has(apiExport.name) === true ||
+          consumedNames?.has(apiExport.name) === true
+        ) {
+          continue;
+        }
+        issues.push({
+          code: "unused-export",
+          message: `${pkg.name} ${entry.subpath} exports ${apiExport.name} without an intentional public contract or cross-workspace consumer`,
+          package: pkg.name,
+          entryPoint: entry.subpath,
+          symbol: apiExport.name,
+        });
+      }
+    }
+  }
+  return issues.sort((left, right) =>
+    [left.package ?? "", left.entryPoint ?? "", left.symbol ?? ""]
+      .join("\0")
+      .localeCompare([right.package ?? "", right.entryPoint ?? "", right.symbol ?? ""].join("\0")),
+  );
 }
 
 export async function analyzePublicApi(repositoryRoot: string): Promise<{
@@ -976,8 +1268,10 @@ function formatIssues(issues: readonly ApiIssue[]): string {
 if (import.meta.main) {
   const mode = process.argv[2];
   const repositoryRoot = resolve(process.argv[3] ?? join(import.meta.dir, ".."));
-  if (mode !== "report" && mode !== "check" && mode !== "baseline") {
-    throw new Error("Usage: bun scripts/public-api.ts <report|check|baseline> [repository-root]");
+  if (mode !== "report" && mode !== "check" && mode !== "baseline" && mode !== "unused") {
+    throw new Error(
+      "Usage: bun scripts/public-api.ts <report|check|baseline|unused> [repository-root]",
+    );
   }
   const result = await analyzePublicApi(repositoryRoot);
   if (mode === "report") {
@@ -993,13 +1287,30 @@ if (import.meta.main) {
     }
     process.stdout.write(`${JSON.stringify(result.manifest, null, 2)}\n`);
   } else if (mode === "baseline") {
-    if (result.issues.length > 0) throw new Error(formatIssues(result.issues));
+    const existingBaseline = await readPublicApiBaseline(repositoryRoot);
+    const unusedIssues = await findUnusedPublicExports(
+      repositoryRoot,
+      result.manifest,
+      existingBaseline,
+    );
+    const issues = [...result.issues, ...unusedIssues];
+    if (issues.length > 0) throw new Error(formatIssues(issues));
     const baseline = await writePublicApiBaseline(repositoryRoot, result.manifest);
     console.log(`Public API baseline updated: ${baseline.sha256}`);
   } else {
     const baseline = await readPublicApiBaseline(repositoryRoot);
-    const issues = [...result.issues, ...checkManifestBaseline(result.manifest, baseline.sha256)];
+    const unusedIssues = await findUnusedPublicExports(repositoryRoot, result.manifest, baseline);
+    const issues =
+      mode === "unused"
+        ? [...result.issues, ...unusedIssues]
+        : [
+            ...result.issues,
+            ...unusedIssues,
+            ...checkManifestBaseline(result.manifest, baseline.sha256),
+          ];
     if (issues.length > 0) throw new Error(formatIssues(issues));
-    console.log("Public API policy check passed");
+    console.log(
+      mode === "unused" ? "Unused public export check passed" : "Public API policy check passed",
+    );
   }
 }

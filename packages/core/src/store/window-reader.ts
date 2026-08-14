@@ -5,15 +5,125 @@ import type { SheetId } from "../types/coordinates.js";
 import type { Workbook } from "../types/document.js";
 import type { ResourceOwnerBytes, VisibleWindowView } from "../types/store.js";
 import type { ConsumingWindowView, RecomputingCellStore } from "./wasm-contract.js";
+import { KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING, NO_STRING } from "./wire-tags.js";
 
-const KIND_NUMBER = 1;
-const KIND_STRING = 2;
-const KIND_BOOL = 3;
 const EMPTY_COND_MATCHES = new Uint32Array(0);
+// Kept independent from the worker cache cap so each thread can be tuned separately.
 const STRING_CACHE_CAP = 65_536;
 const WINDOW_SCRATCH_MAX_REUSE = 65_536;
 const CONDITIONAL_MASK_BITS = Uint32Array.BYTES_PER_ELEMENT * 8;
 const UTF8_DECODER = new TextDecoder();
+
+const WINDOW_PACKED_MAGIC = 0x3157_4e53;
+const WINDOW_PACKED_VERSION = 1;
+const WINDOW_PACKED_HEADER_BYTES = 10 * Uint32Array.BYTES_PER_ELEMENT;
+
+export interface DecodedPackedWindow {
+  readonly nRows: number;
+  readonly nCols: number;
+  readonly kinds: Uint8Array;
+  readonly numbers: Float64Array;
+  readonly stringIds: Uint32Array;
+  readonly stringIndex: Int32Array;
+  readonly styleIds: Uint32Array;
+  readonly styleDict: Uint32Array;
+  readonly condMatches: Uint32Array;
+  readonly localStringCount: number;
+}
+
+/** Validates the internal packed layout before exposing zero-copy owned-buffer views. */
+export function decodePackedWindow(packed: Uint8Array): DecodedPackedWindow {
+  if (packed.byteLength < WINDOW_PACKED_HEADER_BYTES) {
+    throw new Error("Sheetwrite: truncated packed window");
+  }
+  const header = new DataView(packed.buffer, packed.byteOffset, WINDOW_PACKED_HEADER_BYTES);
+  const magic = header.getUint32(0, true);
+  const version = header.getUint32(4, true);
+  const headerBytes = header.getUint32(8, true);
+  const totalBytes = header.getUint32(12, true);
+  const nRows = header.getUint32(16, true);
+  const nCols = header.getUint32(20, true);
+  const cellCount = header.getUint32(24, true);
+  const styleCount = header.getUint32(28, true);
+  const condCount = header.getUint32(32, true);
+  const localStringCount = header.getUint32(36, true);
+  if (
+    magic !== WINDOW_PACKED_MAGIC ||
+    version !== WINDOW_PACKED_VERSION ||
+    headerBytes !== WINDOW_PACKED_HEADER_BYTES
+  ) {
+    throw new Error("Sheetwrite: invalid packed window header");
+  }
+  if (totalBytes > packed.byteLength) {
+    throw new Error("Sheetwrite: truncated packed window");
+  }
+  if (totalBytes !== packed.byteLength) {
+    throw new Error("Sheetwrite: invalid packed window length");
+  }
+  const expectedCellCount = nRows * nCols;
+  if (!Number.isSafeInteger(expectedCellCount) || expectedCellCount !== cellCount) {
+    throw new Error("Sheetwrite: invalid packed window dimensions");
+  }
+  if (condCount !== 0 && condCount !== cellCount) {
+    throw new Error("Sheetwrite: invalid packed conditional-match length");
+  }
+
+  const kindsStart = WINDOW_PACKED_HEADER_BYTES;
+  const numbersStart = alignTo8(checkedPackedEnd(kindsStart, cellCount));
+  const stringIdsStart = checkedPackedEnd(numbersStart, cellCount * Float64Array.BYTES_PER_ELEMENT);
+  const stringIndexStart = checkedPackedEnd(
+    stringIdsStart,
+    cellCount * Uint32Array.BYTES_PER_ELEMENT,
+  );
+  const styleIdsStart = checkedPackedEnd(
+    stringIndexStart,
+    cellCount * Int32Array.BYTES_PER_ELEMENT,
+  );
+  const styleDictStart = checkedPackedEnd(styleIdsStart, cellCount * Uint32Array.BYTES_PER_ELEMENT);
+  const condMatchesStart = checkedPackedEnd(
+    styleDictStart,
+    styleCount * Uint32Array.BYTES_PER_ELEMENT,
+  );
+  const expectedBytes = checkedPackedEnd(
+    condMatchesStart,
+    condCount * Uint32Array.BYTES_PER_ELEMENT,
+  );
+  if (expectedBytes !== totalBytes) {
+    throw new Error("Sheetwrite: invalid packed window layout");
+  }
+
+  const base = packed.byteOffset;
+  if (
+    (base + numbersStart) % Float64Array.BYTES_PER_ELEMENT !== 0 ||
+    (base + stringIdsStart) % Uint32Array.BYTES_PER_ELEMENT !== 0
+  ) {
+    throw new Error("Sheetwrite: invalid packed window alignment");
+  }
+  return {
+    nRows,
+    nCols,
+    kinds: new Uint8Array(packed.buffer, base + kindsStart, cellCount),
+    numbers: new Float64Array(packed.buffer, base + numbersStart, cellCount),
+    stringIds: new Uint32Array(packed.buffer, base + stringIdsStart, cellCount),
+    stringIndex: new Int32Array(packed.buffer, base + stringIndexStart, cellCount),
+    styleIds: new Uint32Array(packed.buffer, base + styleIdsStart, cellCount),
+    styleDict: new Uint32Array(packed.buffer, base + styleDictStart, styleCount),
+    condMatches: new Uint32Array(packed.buffer, base + condMatchesStart, condCount),
+    localStringCount,
+  };
+}
+
+function checkedPackedEnd(start: number, byteLength: number): number {
+  const end = start + byteLength;
+  if (!Number.isSafeInteger(end) || start < 0 || byteLength < 0) {
+    throw new Error("Sheetwrite: invalid packed window layout");
+  }
+  return end;
+}
+
+function alignTo8(value: number): number {
+  return Math.ceil(value / Float64Array.BYTES_PER_ELEMENT) * Float64Array.BYTES_PER_ELEMENT;
+}
 
 export interface PersistedCellView {
   readonly coordinates: Uint32Array;
@@ -24,6 +134,19 @@ export interface PersistedCellView {
   readonly referenceOffsets: Uint32Array;
   readonly referenceTargets: Uint32Array;
 }
+
+/** Exact internal diagnostics attached to each decoded visible-window read. */
+interface VisibleWindowResourceMetrics {
+  readonly ffiCalls: number;
+  readonly ffiBoundaryCalls: number;
+  readonly ffiInputBytes: number;
+  readonly ffiOutputBytes: number;
+  readonly ffiLargestTransferBytes: number;
+  /** Fresh JS-owned packed-buffer allocation plus an optional local-string array. */
+  readonly ffiOutputAllocationEvents: number;
+}
+
+export type InstrumentedVisibleWindowView = VisibleWindowView & VisibleWindowResourceMetrics;
 
 /** Owns packed-window decoding, caches, and reusable viewport scratch. */
 export class StoreWindowReader {
@@ -191,7 +314,7 @@ export class StoreWindowReader {
     cols: readonly number[],
     order: Uint32Array | undefined,
     applyConditionalRules: boolean,
-  ): VisibleWindowView {
+  ): InstrumentedVisibleWindowView {
     const handle = this.handleOf(sheet);
     const colsU32 = this.colsU32For(cols);
     let ffiCalls = 1;
@@ -214,46 +337,70 @@ export class StoreWindowReader {
     }
 
     let view: ConsumingWindowView;
+    let expectedRows: number;
     if (order) {
       const dataRows = order.subarray(rows.start, Math.min(rows.end, order.length));
+      expectedRows = dataRows.length;
       ffiInputBytes += dataRows.byteLength;
       ffiLargestTransferBytes = Math.max(ffiLargestTransferBytes, dataRows.byteLength);
       view = this.wasm.getWindowRows(handle, dataRows, colsU32) as ConsumingWindowView;
     } else {
+      expectedRows = Math.max(0, rows.end - rows.start);
       view = this.wasm.getWindow(handle, rows.start, rows.end, colsU32) as ConsumingWindowView;
     }
     ffiCalls += 1;
 
-    const kinds = view.takeKinds();
-    const numbers = view.takeNumbers();
-    const stringIds = view.takeStringIds();
-    const stringIndex = view.takeStringIndex();
-    const styleIds = view.takeStyleIndex();
-    const styleDict = view.takeStyleDict();
-    const strings = view.takeStrings();
-    const condMatches = hasCondRules ? view.takeCondMatches() : EMPTY_COND_MATCHES;
-    view.free();
-    let ffiBoundaryCalls = ffiCalls + 8 + (hasCondRules ? 1 : 0);
-    let ffiOutputBytes =
-      kinds.byteLength +
-      numbers.byteLength +
-      stringIds.byteLength +
-      stringIndex.byteLength +
-      styleIds.byteLength +
-      styleDict.byteLength +
-      condMatches.byteLength;
+    let packed: Uint8Array;
+    let decoded: DecodedPackedWindow;
+    let strings: string[];
+    try {
+      packed = view.takePacked();
+      decoded = decodePackedWindow(packed);
+      if (
+        decoded.nCols !== colsU32.length ||
+        decoded.nRows > expectedRows ||
+        (order !== undefined && decoded.nRows !== expectedRows) ||
+        (hasCondRules &&
+          decoded.kinds.length > 0 &&
+          decoded.condMatches.length !== decoded.kinds.length)
+      ) {
+        throw new Error("Sheetwrite: invalid packed window shape");
+      }
+      strings = decoded.localStringCount === 0 ? [] : view.takeStrings();
+      if (strings.length !== decoded.localStringCount) {
+        throw new Error("Sheetwrite: invalid packed window strings");
+      }
+      for (let index = 0; index < decoded.kinds.length; index++) {
+        const kind = decoded.kinds[index];
+        const local = decoded.stringIndex[index]!;
+        const pool = decoded.stringIds[index]!;
+        if (
+          (kind !== KIND_EMPTY &&
+            kind !== KIND_NUMBER &&
+            kind !== KIND_STRING &&
+            kind !== KIND_BOOL) ||
+          local < -1 ||
+          local >= strings.length ||
+          (local >= 0 && (kind !== KIND_STRING || pool !== NO_STRING)) ||
+          (kind === KIND_STRING && pool === NO_STRING && local < 0)
+        ) {
+          throw new Error("Sheetwrite: invalid packed window value");
+        }
+      }
+    } finally {
+      view.free();
+    }
+    const { kinds, numbers, stringIds, stringIndex, styleIds, styleDict } = decoded;
+    const condMatches = hasCondRules ? decoded.condMatches : EMPTY_COND_MATCHES;
+    const stringOutputAllocationEvents = decoded.localStringCount === 0 ? 0 : 1;
+    let ffiBoundaryCalls = ffiCalls + 2 + stringOutputAllocationEvents;
     let localStringBytes = 0;
     for (const value of strings) localStringBytes += utf8ByteLength(value);
-    ffiOutputBytes += localStringBytes;
+    let ffiOutputBytes = packed.byteLength + localStringBytes;
+    const ffiOutputAllocationEvents = 1 + stringOutputAllocationEvents;
     ffiLargestTransferBytes = Math.max(
       ffiLargestTransferBytes,
-      kinds.byteLength,
-      numbers.byteLength,
-      stringIds.byteLength,
-      stringIndex.byteLength,
-      styleIds.byteLength,
-      styleDict.byteLength,
-      condMatches.byteLength,
+      packed.byteLength,
       localStringBytes,
     );
 
@@ -264,7 +411,7 @@ export class StoreWindowReader {
 
     for (let i = 0; i < stringIds.length; i++) {
       const id = stringIds[i];
-      if (id !== undefined && id !== 0xffffffff && !this.stringCache.has(id)) {
+      if (id !== undefined && id !== NO_STRING && !this.stringCache.has(id)) {
         if (!missingIdSet) missingIdSet = new Set<number>();
         missingIdSet.add(id);
       }
@@ -284,7 +431,7 @@ export class StoreWindowReader {
         poolStringBytes,
       );
       for (let i = 0; i < stringPoolUpdateValues.length; i++) {
-        this.stringCache.set(stringPoolUpdateIds[i] ?? 0xffffffff, stringPoolUpdateValues[i] ?? "");
+        this.stringCache.set(stringPoolUpdateIds[i] ?? NO_STRING, stringPoolUpdateValues[i] ?? "");
       }
     }
 
@@ -295,8 +442,8 @@ export class StoreWindowReader {
       } else if (kinds[i] === KIND_BOOL) {
         values[i] = (numbers[i] ?? 0) !== 0;
       } else if (kinds[i] === KIND_STRING) {
-        const poolId = stringIds[i] ?? 0xffffffff;
-        if (poolId !== 0xffffffff) {
+        const poolId = stringIds[i] ?? NO_STRING;
+        if (poolId !== NO_STRING) {
           values[i] = this.stringCache.get(poolId) ?? null;
         } else {
           const stringSlot = stringIndex[i] ?? -1;
@@ -331,6 +478,7 @@ export class StoreWindowReader {
       ffiOutputBytes,
       ffiLargestTransferBytes,
       ffiBoundaryCalls,
+      ffiOutputAllocationEvents,
       ffiCalls,
     };
   }

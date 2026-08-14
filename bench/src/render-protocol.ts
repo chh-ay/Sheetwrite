@@ -1,11 +1,21 @@
 import type { AggregateSample } from "./stats.js";
-import { summarizeFinite } from "./stats.js";
+import { counterbalancedOrder, summarizeFinite } from "./stats.js";
 
 export const RENDER_PROTOCOL_VERSION = 1;
 export const RENDER_MINIMUM_SAMPLE_MS = 100;
 export const RENDER_MAX_LAUNCH_ATTEMPTS = 2;
 export const RENDER_VIEWPORT = { width: 640, height: 480 } as const;
 export const RENDER_ORDER_SEED = 0x51c0ffee;
+export const WINDOW_TRANSFER_ORDER_SEED = 0x57494e44;
+export const WINDOW_TRANSFER_BASELINE_SCENARIO_ID = "window-transfer.scroll.baseline" as const;
+export const WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID =
+  "window-transfer.scroll.reuse-decoded-view-upper-bound" as const;
+export const WINDOW_TRANSFER_SCENARIO_IDS = [
+  WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
+  WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
+] as const;
+export type WindowTransferScenarioId = (typeof WINDOW_TRANSFER_SCENARIO_IDS)[number];
+export type RenderDataValidity = "product-valid" | "pixel-data-invalid";
 
 export const ENGINE_IDS = ["sheetwrite", "handsontable"] as const;
 export type EngineId = (typeof ENGINE_IDS)[number];
@@ -16,7 +26,9 @@ export type ScenarioGroup =
   | "altering"
   | "arrow-keys-navigation"
   | "formatting"
-  | "merges";
+  | "merges"
+  | "formulae"
+  | "geometry";
 
 export const RENDER_SCENARIOS = [
   { id: "scroll-down.top-left", group: "view-scrolling" },
@@ -35,7 +47,24 @@ export const RENDER_SCENARIOS = [
   { id: "merge-heavy.paint", group: "merges" },
 ] as const satisfies readonly { readonly id: string; readonly group: ScenarioGroup }[];
 
-export type ScenarioId = (typeof RENDER_SCENARIOS)[number]["id"];
+export const DIAGNOSTIC_RENDER_SCENARIOS = [
+  { id: "formula-dense.paint", group: "formulae" },
+  { id: "text-heavy.long-scroll", group: "view-scrolling" },
+  { id: "scroll-fractional.same-window", group: "view-scrolling" },
+  { id: "geometry-unresized.1m", group: "geometry" },
+  { id: WINDOW_TRANSFER_BASELINE_SCENARIO_ID, group: "view-scrolling" },
+  { id: WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID, group: "view-scrolling" },
+] as const satisfies readonly { readonly id: string; readonly group: ScenarioGroup }[];
+
+export const ALL_RENDER_SCENARIOS = [...RENDER_SCENARIOS, ...DIAGNOSTIC_RENDER_SCENARIOS] as const;
+
+export type ScenarioId = (typeof ALL_RENDER_SCENARIOS)[number]["id"];
+
+export function scenarioDataValidity(scenarioId: ScenarioId): RenderDataValidity | undefined {
+  if (scenarioId === WINDOW_TRANSFER_BASELINE_SCENARIO_ID) return "product-valid";
+  if (scenarioId === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID) return "pixel-data-invalid";
+  return undefined;
+}
 export type FailureStage =
   | "build"
   | "launch"
@@ -52,6 +81,8 @@ export interface ScenarioIdentity {
   readonly rows: number;
   readonly scenarioId: ScenarioId;
   readonly group: ScenarioGroup;
+  /** Required only for the controlled visible-window transfer diagnostic pair. */
+  readonly dataValidity?: RenderDataValidity;
 }
 
 export interface ValidationObservation {
@@ -81,8 +112,61 @@ export interface MergeIndexResourceMetrics {
   readonly candidatesExamined: number;
 }
 
+export interface WindowTransferMetrics {
+  /** Timed paint calls completed by the coordinator. */
+  readonly logicalFrames: number;
+  /** Visible-window reads requested by the coordinator. */
+  readonly windowReadRequests: number;
+  /** Requests that performed a fresh WASM window read and decode. */
+  readonly logicalWindowReads: number;
+  /** Exact copied WASM-to-JS output payload bytes. */
+  readonly copiedBytes: number;
+  /** Exact consuming output-accessor return allocations. */
+  readonly outputAllocationEvents: number;
+  readonly copiedBytesPerLogicalFrame: number;
+  readonly outputAllocationEventsPerLogicalFrame: number;
+  readonly copiedBytesPerLogicalRead: number | null;
+  readonly outputAllocationEventsPerLogicalRead: number | null;
+}
+
+export function createWindowTransferMetrics(input: {
+  readonly logicalFrames: number;
+  readonly windowReadRequests: number;
+  readonly logicalWindowReads: number;
+  readonly copiedBytes: number;
+  readonly outputAllocationEvents: number;
+}): WindowTransferMetrics {
+  if (
+    !Number.isSafeInteger(input.logicalFrames) ||
+    input.logicalFrames <= 0 ||
+    !Number.isSafeInteger(input.windowReadRequests) ||
+    input.windowReadRequests < 0 ||
+    !Number.isSafeInteger(input.logicalWindowReads) ||
+    input.logicalWindowReads < 0 ||
+    input.logicalWindowReads > input.windowReadRequests ||
+    !Number.isSafeInteger(input.copiedBytes) ||
+    input.copiedBytes < 0 ||
+    !Number.isSafeInteger(input.outputAllocationEvents) ||
+    input.outputAllocationEvents < 0
+  ) {
+    throw new RangeError("invalid visible-window transfer counters");
+  }
+  return {
+    ...input,
+    copiedBytesPerLogicalFrame: input.copiedBytes / input.logicalFrames,
+    outputAllocationEventsPerLogicalFrame: input.outputAllocationEvents / input.logicalFrames,
+    copiedBytesPerLogicalRead:
+      input.logicalWindowReads === 0 ? null : input.copiedBytes / input.logicalWindowReads,
+    outputAllocationEventsPerLogicalRead:
+      input.logicalWindowReads === 0
+        ? null
+        : input.outputAllocationEvents / input.logicalWindowReads,
+  };
+}
+
 export interface MeasuredSample extends AggregateSample {
   readonly index: number;
+  readonly windowTransfer?: WindowTransferMetrics;
 }
 
 export interface SuccessfulScenario extends ScenarioIdentity {
@@ -96,6 +180,7 @@ export interface SuccessfulScenario extends ScenarioIdentity {
   readonly memory: MemoryDelta;
   readonly resources?: RenderResourceMetrics;
   readonly mergeResources?: MergeIndexResourceMetrics;
+  readonly windowTransfer?: WindowTransferMetrics;
 }
 
 export interface FailedScenario extends ScenarioIdentity {
@@ -145,6 +230,8 @@ export interface RenderRunMetadata {
   readonly orderSeed: number;
   readonly engineOrder: readonly (readonly EngineId[])[];
   readonly launchAttempts: readonly BrowserLaunchAttempt[];
+  /** Present only when the controlled window-transfer diagnostic pair is configured. */
+  readonly windowTransferScenarioOrder?: readonly (readonly WindowTransferScenarioId[])[];
 }
 
 export interface RenderRunConfig {
@@ -185,7 +272,7 @@ export interface BrowserCombinationResult {
 }
 
 const SCENARIO_GROUPS = new Map<ScenarioId, ScenarioGroup>(
-  RENDER_SCENARIOS.map((scenario) => [scenario.id, scenario.group]),
+  ALL_RENDER_SCENARIOS.map((scenario) => [scenario.id, scenario.group]),
 );
 
 export function scenarioGroup(scenarioId: ScenarioId): ScenarioGroup {
@@ -366,6 +453,53 @@ function parseMergeResources(value: unknown, path: string): MergeIndexResourceMe
   };
 }
 
+function parseWindowTransferMetrics(value: unknown, path: string): WindowTransferMetrics {
+  const input = record(value, path);
+  const counters = {
+    logicalFrames: integer(input.logicalFrames, `${path}.logicalFrames`, 1),
+    windowReadRequests: integer(input.windowReadRequests, `${path}.windowReadRequests`, 0),
+    logicalWindowReads: integer(input.logicalWindowReads, `${path}.logicalWindowReads`, 0),
+    copiedBytes: integer(input.copiedBytes, `${path}.copiedBytes`, 0),
+    outputAllocationEvents: integer(
+      input.outputAllocationEvents,
+      `${path}.outputAllocationEvents`,
+      0,
+    ),
+  };
+  const expected = createWindowTransferMetrics(counters);
+  const observed = {
+    copiedBytesPerLogicalFrame: finite(
+      input.copiedBytesPerLogicalFrame,
+      `${path}.copiedBytesPerLogicalFrame`,
+      0,
+    ),
+    outputAllocationEventsPerLogicalFrame: finite(
+      input.outputAllocationEventsPerLogicalFrame,
+      `${path}.outputAllocationEventsPerLogicalFrame`,
+      0,
+    ),
+    copiedBytesPerLogicalRead: nullableFinite(
+      input.copiedBytesPerLogicalRead,
+      `${path}.copiedBytesPerLogicalRead`,
+    ),
+    outputAllocationEventsPerLogicalRead: nullableFinite(
+      input.outputAllocationEventsPerLogicalRead,
+      `${path}.outputAllocationEventsPerLogicalRead`,
+    ),
+  };
+  for (const field of [
+    "copiedBytesPerLogicalFrame",
+    "outputAllocationEventsPerLogicalFrame",
+    "copiedBytesPerLogicalRead",
+    "outputAllocationEventsPerLogicalRead",
+  ] as const) {
+    if (observed[field] !== expected[field]) {
+      throw new TypeError(`${path}.${field} does not match its exact counters`);
+    }
+  }
+  return expected;
+}
+
 function parseSample(value: unknown, path: string): MeasuredSample {
   const input = record(value, path);
   const durationMs = finite(input.durationMs, `${path}.durationMs`, 0);
@@ -380,22 +514,46 @@ function parseSample(value: unknown, path: string): MeasuredSample {
     durationMs,
     operationCount,
     perOperationMs,
+    ...(input.windowTransfer === undefined
+      ? {}
+      : {
+          windowTransfer: parseWindowTransferMetrics(
+            input.windowTransfer,
+            `${path}.windowTransfer`,
+          ),
+        }),
   };
 }
 
 function parseIdentity(value: Record<string, unknown>, path: string): ScenarioIdentity {
   const scenarioId = enumValue(
     value.scenarioId,
-    RENDER_SCENARIOS.map((scenario) => scenario.id),
+    ALL_RENDER_SCENARIOS.map((scenario) => scenario.id),
     `${path}.scenarioId`,
   );
   const group = enumValue(
     value.group,
-    ["view-scrolling", "editing", "altering", "arrow-keys-navigation", "formatting", "merges"],
+    ALL_RENDER_SCENARIOS.map((scenario) => scenario.group),
     `${path}.group`,
   );
   if (group !== scenarioGroup(scenarioId)) {
     throw new TypeError(`${path}.group does not match scenario ${scenarioId}`);
+  }
+  const expectedDataValidity = scenarioDataValidity(scenarioId);
+  const dataValidity =
+    value.dataValidity === undefined
+      ? undefined
+      : enumValue(
+          value.dataValidity,
+          ["product-valid", "pixel-data-invalid"],
+          `${path}.dataValidity`,
+        );
+  if (dataValidity !== expectedDataValidity) {
+    throw new TypeError(
+      expectedDataValidity === undefined
+        ? `${path}.dataValidity is reserved for window-transfer diagnostics`
+        : `${path}.dataValidity must be ${expectedDataValidity} for ${scenarioId}`,
+    );
   }
   return {
     runId: text(value.runId, `${path}.runId`),
@@ -404,6 +562,7 @@ function parseIdentity(value: Record<string, unknown>, path: string): ScenarioId
     rows: integer(value.rows, `${path}.rows`, 1),
     scenarioId,
     group,
+    ...(dataValidity === undefined ? {} : { dataValidity }),
   };
 }
 
@@ -464,6 +623,74 @@ export function parseScenarioResult(
   }
   const summary = summarizeFinite(rawSamples.map((sample) => sample.perOperationMs));
   const operationCount = rawSamples.reduce((total, sample) => total + sample.operationCount, 0);
+  const isWindowTransferDiagnostic = identity.dataValidity !== undefined;
+  let windowTransfer: WindowTransferMetrics | undefined;
+  if (isWindowTransferDiagnostic) {
+    if (identity.engine !== "sheetwrite") {
+      throw new TypeError(`${path} window-transfer diagnostics require the sheetwrite engine`);
+    }
+    const sampleMetrics = rawSamples.map((sample, index) => {
+      const metrics = sample.windowTransfer;
+      if (!metrics) {
+        throw new TypeError(`${path}.rawSamples[${index}].windowTransfer is required`);
+      }
+      if (
+        metrics.logicalFrames !== sample.operationCount ||
+        metrics.windowReadRequests !== metrics.logicalFrames
+      ) {
+        throw new TypeError(
+          `${path}.rawSamples[${index}].windowTransfer must account for every timed frame`,
+        );
+      }
+      if (identity.dataValidity === "product-valid") {
+        if (
+          metrics.logicalWindowReads !== metrics.logicalFrames ||
+          metrics.copiedBytes <= 0 ||
+          metrics.outputAllocationEvents <= 0
+        ) {
+          throw new TypeError(
+            `${path}.rawSamples[${index}].windowTransfer is missing baseline read counters`,
+          );
+        }
+      } else if (
+        metrics.logicalWindowReads !== 0 ||
+        metrics.copiedBytes !== 0 ||
+        metrics.outputAllocationEvents !== 0
+      ) {
+        throw new TypeError(
+          `${path}.rawSamples[${index}].windowTransfer upper bound performed a fresh read`,
+        );
+      }
+      return metrics;
+    });
+    const expectedWindowTransfer = createWindowTransferMetrics({
+      logicalFrames: sampleMetrics.reduce((sum, metrics) => sum + metrics.logicalFrames, 0),
+      windowReadRequests: sampleMetrics.reduce(
+        (sum, metrics) => sum + metrics.windowReadRequests,
+        0,
+      ),
+      logicalWindowReads: sampleMetrics.reduce(
+        (sum, metrics) => sum + metrics.logicalWindowReads,
+        0,
+      ),
+      copiedBytes: sampleMetrics.reduce((sum, metrics) => sum + metrics.copiedBytes, 0),
+      outputAllocationEvents: sampleMetrics.reduce(
+        (sum, metrics) => sum + metrics.outputAllocationEvents,
+        0,
+      ),
+    });
+    windowTransfer = parseWindowTransferMetrics(input.windowTransfer, `${path}.windowTransfer`);
+    for (const field of Object.keys(expectedWindowTransfer) as (keyof WindowTransferMetrics)[]) {
+      if (windowTransfer[field] !== expectedWindowTransfer[field]) {
+        throw new TypeError(`${path}.windowTransfer does not match its raw samples`);
+      }
+    }
+  } else if (
+    input.windowTransfer !== undefined ||
+    rawSamples.some((sample) => sample.windowTransfer !== undefined)
+  ) {
+    throw new TypeError(`${path}.windowTransfer is reserved for the controlled diagnostic pair`);
+  }
   const medianMs = finite(input.medianMs, `${path}.medianMs`, 0);
   const p95Ms = finite(input.p95Ms, `${path}.p95Ms`, 0);
   const madMs = finite(input.madMs, `${path}.madMs`, 0);
@@ -493,6 +720,7 @@ export function parseScenarioResult(
       : {
           mergeResources: parseMergeResources(input.mergeResources, `${path}.mergeResources`),
         }),
+    ...(windowTransfer === undefined ? {} : { windowTransfer }),
   };
 }
 
@@ -526,6 +754,19 @@ function parseMetadata(value: unknown, path: string): RenderRunMetadata {
       enumValue(engine, ENGINE_IDS, `${path}.engineOrder[${round}][${index}]`),
     ),
   );
+  const windowTransferScenarioOrder =
+    input.windowTransferScenarioOrder === undefined
+      ? undefined
+      : array(input.windowTransferScenarioOrder, `${path}.windowTransferScenarioOrder`).map(
+          (entry, round) =>
+            array(entry, `${path}.windowTransferScenarioOrder[${round}]`).map((scenario, index) =>
+              enumValue(
+                scenario,
+                WINDOW_TRANSFER_SCENARIO_IDS,
+                `${path}.windowTransferScenarioOrder[${round}][${index}]`,
+              ),
+            ),
+        );
   const metadata: RenderRunMetadata = {
     commit: text(input.commit, `${path}.commit`),
     dirty: bool(input.dirty, `${path}.dirty`),
@@ -564,6 +805,7 @@ function parseMetadata(value: unknown, path: string): RenderRunMetadata {
     launchAttempts: array(input.launchAttempts, `${path}.launchAttempts`).map((entry, index) =>
       parseLaunchAttempt(entry, `${path}.launchAttempts[${index}]`),
     ),
+    ...(windowTransferScenarioOrder === undefined ? {} : { windowTransferScenarioOrder }),
   };
   if (!Number.isFinite(Date.parse(metadata.timestamp))) {
     throw new TypeError(`${path}.timestamp must be an ISO timestamp`);
@@ -585,7 +827,7 @@ function parseConfig(value: unknown, path: string): RenderRunConfig {
   const scenarios = array(input.scenarios, `${path}.scenarios`).map((scenario, index) =>
     enumValue(
       scenario,
-      RENDER_SCENARIOS.map((entry) => entry.id),
+      ALL_RENDER_SCENARIOS.map((entry) => entry.id),
       `${path}.scenarios[${index}]`,
     ),
   );
@@ -619,6 +861,74 @@ function equalStringArrays(left: readonly string[], right: readonly string[]): b
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
+export interface WindowTransferComparison {
+  readonly rows: number;
+  readonly baselineRepetitionMediansMs: readonly number[];
+  readonly upperBoundRepetitionMediansMs: readonly number[];
+  readonly baselineMedianMs: number;
+  readonly upperBoundMedianMs: number;
+  readonly estimatedWindowTransferCostMs: number;
+  readonly crossVariantSpreadMs: number;
+  readonly maximumWithinVariantSpreadMs: number;
+  /** True only when the cross-variant effect exceeds both repetition-median spreads. */
+  readonly resolved: boolean;
+}
+
+export function summarizeWindowTransferComparisons(
+  artifact: Pick<RenderBenchmarkArtifact, "config" | "metadata" | "results">,
+): WindowTransferComparison[] {
+  if (
+    !WINDOW_TRANSFER_SCENARIO_IDS.every((scenario) => artifact.config.scenarios.includes(scenario))
+  ) {
+    return [];
+  }
+  return artifact.config.rows.map((rows) => {
+    const repetitionMedians = (scenarioId: WindowTransferScenarioId): number[] => {
+      const matching = artifact.results
+        .filter(
+          (result): result is SuccessfulScenario =>
+            result.rows === rows &&
+            result.engine === "sheetwrite" &&
+            result.scenarioId === scenarioId &&
+            result.status === "success",
+        )
+        .sort((left, right) => left.round - right.round);
+      if (
+        matching.length !== artifact.metadata.rounds ||
+        matching.some((result, index) => result.round !== index + 1)
+      ) {
+        throw new TypeError(
+          `window-transfer comparison for ${rows} rows requires one successful result per repetition`,
+        );
+      }
+      return matching.map((result) => result.medianMs);
+    };
+    const baselineRepetitionMediansMs = repetitionMedians(WINDOW_TRANSFER_BASELINE_SCENARIO_ID);
+    const upperBoundRepetitionMediansMs = repetitionMedians(
+      WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
+    );
+    const baselineMedianMs = summarizeFinite(baselineRepetitionMediansMs).median;
+    const upperBoundMedianMs = summarizeFinite(upperBoundRepetitionMediansMs).median;
+    const maximumWithinVariantSpreadMs = Math.max(
+      Math.max(...baselineRepetitionMediansMs) - Math.min(...baselineRepetitionMediansMs),
+      Math.max(...upperBoundRepetitionMediansMs) - Math.min(...upperBoundRepetitionMediansMs),
+    );
+    const estimatedWindowTransferCostMs = baselineMedianMs - upperBoundMedianMs;
+    const crossVariantSpreadMs = Math.abs(estimatedWindowTransferCostMs);
+    return {
+      rows,
+      baselineRepetitionMediansMs,
+      upperBoundRepetitionMediansMs,
+      baselineMedianMs,
+      upperBoundMedianMs,
+      estimatedWindowTransferCostMs,
+      crossVariantSpreadMs,
+      maximumWithinVariantSpreadMs,
+      resolved: crossVariantSpreadMs > maximumWithinVariantSpreadMs,
+    };
+  });
+}
+
 export function parseRenderArtifact(
   value: unknown,
   options: ParseRenderOptions = {},
@@ -642,6 +952,46 @@ export function parseRenderArtifact(
     }
   }
   const config = parseConfig(input.config, "artifact.config");
+  const configuredWindowTransferScenarios = config.scenarios.filter((scenario) =>
+    WINDOW_TRANSFER_SCENARIO_IDS.includes(scenario as WindowTransferScenarioId),
+  );
+  if (configuredWindowTransferScenarios.length === 0) {
+    if (metadata.windowTransferScenarioOrder !== undefined) {
+      throw new TypeError(
+        "artifact.metadata.windowTransferScenarioOrder is reserved for the diagnostic pair",
+      );
+    }
+  } else {
+    if (
+      configuredWindowTransferScenarios.length !== WINDOW_TRANSFER_SCENARIO_IDS.length ||
+      !WINDOW_TRANSFER_SCENARIO_IDS.every((scenario) =>
+        configuredWindowTransferScenarios.includes(scenario),
+      )
+    ) {
+      throw new TypeError("window-transfer baseline and upper-bound scenarios must run together");
+    }
+    if (config.engines.length !== 1 || config.engines[0] !== "sheetwrite") {
+      throw new TypeError("window-transfer diagnostics support only the sheetwrite engine");
+    }
+    const expectedOrder = counterbalancedOrder(
+      WINDOW_TRANSFER_SCENARIO_IDS,
+      metadata.rounds,
+      WINDOW_TRANSFER_ORDER_SEED,
+    );
+    if (
+      metadata.windowTransferScenarioOrder === undefined ||
+      metadata.windowTransferScenarioOrder.length !== expectedOrder.length ||
+      metadata.windowTransferScenarioOrder.some(
+        (order, round) =>
+          order.length !== expectedOrder[round]!.length ||
+          order.some((scenario, index) => scenario !== expectedOrder[round]![index]),
+      )
+    ) {
+      throw new TypeError(
+        "artifact.metadata.windowTransferScenarioOrder is not the required counterbalance",
+      );
+    }
+  }
   for (const engine of config.engines) {
     for (const order of metadata.engineOrder) {
       if (!order.includes(engine) || order.length !== config.engines.length) {
@@ -724,7 +1074,7 @@ export function parseRenderArtifact(
   if (!completeness.complete) {
     throw new TypeError("render artifact matrix is incomplete or duplicated");
   }
-  return {
+  const artifact: RenderBenchmarkArtifact = {
     protocolVersion: RENDER_PROTOCOL_VERSION,
     runId,
     metadata,
@@ -733,6 +1083,10 @@ export function parseRenderArtifact(
     completeness,
     reproductionCommands: stringArray(input.reproductionCommands, "artifact.reproductionCommands"),
   };
+  if (completeness.successful && configuredWindowTransferScenarios.length > 0) {
+    summarizeWindowTransferComparisons(artifact);
+  }
+  return artifact;
 }
 
 export function parseRenderArtifactJson(
@@ -818,13 +1172,42 @@ export function renderBenchmarkMarkdown(value: RenderBenchmarkArtifact): string 
           if (result.status === "failed") {
             return `**FAILED (${result.stage})** — ${escapeMarkdown(result.errorClass)}: ${escapeMarkdown(result.message)}`;
           }
-          return `median ${formatMs(result.medianMs)} ms; p95 ${formatMs(result.p95Ms)}; MAD ${formatMs(result.madMs)}; ${result.rawSamples.length} samples / ${result.operationCount} ops`;
+          const transfer = result.windowTransfer;
+          const transferEvidence =
+            transfer === undefined
+              ? ""
+              : `; validity ${result.dataValidity}; copied/frame ${transfer.copiedBytesPerLogicalFrame.toFixed(3)} B; allocations/frame ${transfer.outputAllocationEventsPerLogicalFrame.toFixed(3)}; copied/read ${transfer.copiedBytesPerLogicalRead === null ? "n/a" : `${transfer.copiedBytesPerLogicalRead.toFixed(3)} B`}; allocations/read ${transfer.outputAllocationEventsPerLogicalRead === null ? "n/a" : transfer.outputAllocationEventsPerLogicalRead.toFixed(3)}`;
+          return `median ${formatMs(result.medianMs)} ms; p95 ${formatMs(result.p95Ms)}; MAD ${formatMs(result.madMs)}; ${result.rawSamples.length} samples / ${result.operationCount} ops${transferEvidence}`;
         });
         const identityLabel = `r${round}-${rows}-${scenarioId}`;
         lines.push(
           `| ${round} | ${rows.toLocaleString("en-US")} | [\`${escapeMarkdown(identityLabel)}\`](./render-results.json) | ${cells.join(" | ")} |`,
         );
       }
+    }
+  }
+
+  if (
+    artifact.completeness.successful &&
+    WINDOW_TRANSFER_SCENARIO_IDS.every((scenario) => artifact.config.scenarios.includes(scenario))
+  ) {
+    lines.push(
+      "",
+      "## Visible-window transfer diagnostic",
+      "",
+      "> The reuse upper bound deliberately paints a prior decoded view. Its pixels/data are invalid and it is not a product-valid rendering result.",
+      "",
+      `Counterbalanced scenario order: ${artifact.metadata.windowTransferScenarioOrder
+        ?.map((order, index) => `round ${index + 1}: ${order.join(" → ")}`)
+        .join("; ")}`,
+      "",
+      "| rows | baseline repetition medians | upper-bound repetition medians | estimated transfer cost | cross-variant spread | maximum within-variant spread | resolution |",
+      "|---:|:--|:--|---:|---:|---:|:--|",
+    );
+    for (const comparison of summarizeWindowTransferComparisons(artifact)) {
+      lines.push(
+        `| ${comparison.rows.toLocaleString("en-US")} | ${comparison.baselineRepetitionMediansMs.map(formatMs).join(", ")} ms | ${comparison.upperBoundRepetitionMediansMs.map(formatMs).join(", ")} ms | ${formatMs(comparison.estimatedWindowTransferCostMs)} ms | ${formatMs(comparison.crossVariantSpreadMs)} ms | ${formatMs(comparison.maximumWithinVariantSpreadMs)} ms | ${comparison.resolved ? "resolved" : "unresolved"} |`,
+      );
     }
   }
 

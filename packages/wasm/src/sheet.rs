@@ -20,7 +20,10 @@ pub(crate) enum CondPred {
     EqNum(f64),
     EqStr(String),
     EqEmpty,
-    Contains { needle: String, match_case: bool },
+    Contains {
+        needle: String,
+        match_case: bool,
+    },
     Formula {
         ast: Ast,
         anchor_row: u32,
@@ -1777,12 +1780,20 @@ impl SheetData {
     }
 }
 
-pub(crate) fn formula_error_at(sheet: &SheetData, key: CellKey) -> Option<FormulaError> {
+pub(crate) fn formula_error_with_entry(
+    sheet: &SheetData,
+    key: CellKey,
+    entry: Option<&FormulaEntry>,
+) -> Option<FormulaError> {
     sheet
         .spill_errors
         .get(&key)
         .copied()
-        .or_else(|| sheet.formulas.get(&key).and_then(|entry| entry.error))
+        .or_else(|| entry.and_then(|entry| entry.error))
+}
+
+pub(crate) fn formula_error_at(sheet: &SheetData, key: CellKey) -> Option<FormulaError> {
+    formula_error_with_entry(sheet, key, sheet.formulas.get(&key))
 }
 
 #[cfg(test)]

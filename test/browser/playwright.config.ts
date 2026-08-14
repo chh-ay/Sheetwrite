@@ -30,6 +30,7 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
+      grepInvert: /@dpr2-render/,
       use: { browserName: "chromium" },
     },
     {
@@ -41,6 +42,37 @@ export default defineConfig({
       name: "webkit",
       grep: /@portability/,
       use: { browserName: "webkit" },
+    },
+    // These projects exercise Playwright browser engines at a real DPR 2.
+    // Their names deliberately make no OS-browser claim: native macOS Safari
+    // hardware verification remains an external release check.
+    {
+      name: "chromium-engine-dpr2",
+      grep: /@dpr2-render/,
+      metadata: {
+        automationEngine: "Playwright Chromium",
+        hostPlatform: `${process.platform}-${process.arch}`,
+        nativeMacOSSafariHardwareVerification: "external",
+      },
+      use: {
+        browserName: "chromium",
+        deviceScaleFactor: 2,
+        viewport: { width: 1_568, height: 900 },
+      },
+    },
+    {
+      name: "webkit-engine-dpr2",
+      grep: /@dpr2-render/,
+      metadata: {
+        automationEngine: "Playwright WebKit (not macOS Safari)",
+        hostPlatform: `${process.platform}-${process.arch}`,
+        nativeMacOSSafariHardwareVerification: "external",
+      },
+      use: {
+        browserName: "webkit",
+        deviceScaleFactor: 2,
+        viewport: { width: 1_568, height: 900 },
+      },
     },
   ],
   webServer: {

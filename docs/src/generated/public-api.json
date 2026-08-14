@@ -490,18 +490,6 @@
               ]
             },
             {
-              "name": "cloneCellHyperlink",
-              "kind": "function",
-              "signature": "(link: CellHyperlink): CellHyperlink",
-              "owners": [
-                "src/hyperlink.ts"
-              ],
-              "source": "src/hyperlink.ts#L263",
-              "jsDocTags": [],
-              "documentation": "Clone one validated hyperlink into an independent plain-data value.",
-              "memberDocs": []
-            },
-            {
               "name": "colToA1",
               "kind": "function",
               "signature": "(col: number): string",
@@ -894,25 +882,13 @@
               "memberDocs": []
             },
             {
-              "name": "createHyperlinkId",
-              "kind": "function",
-              "signature": "(): string",
-              "owners": [
-                "src/hyperlink.ts"
-              ],
-              "source": "src/hyperlink.ts#L329",
-              "jsDocTags": [],
-              "documentation": "Produce a new stable identity for copied hyperlinks without trusting clipboard IDs.",
-              "memberDocs": []
-            },
-            {
               "name": "createRowBridge",
               "kind": "function",
               "signature": "<Row extends Record<string, CellScalar>, Id extends RowBridgeId = RowBridgeId>(options: RowBridgeOptions<Row, Id>): RowBridge<Id>",
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L859",
+              "source": "src/row-bridge.ts#L858",
               "jsDocTags": [],
               "documentation": "Create a typed bridge while preserving row and identity inference.",
               "memberDocs": []
@@ -2041,7 +2017,7 @@
               "owners": [
                 "src/store/data-engine.ts"
               ],
-              "source": "src/store/data-engine.ts#L245",
+              "source": "src/store/data-engine.ts#L242",
               "jsDocTags": [],
               "documentation": "Error thrown when an operation requires datasource cells that are not loaded.",
               "memberDocs": []
@@ -2990,7 +2966,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L313",
+              "source": "src/row-bridge.ts#L312",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -3031,7 +3007,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L82",
+              "source": "src/row-bridge.ts#L81",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -3055,7 +3031,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L156",
+              "source": "src/row-bridge.ts#L155",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -3067,7 +3043,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L98",
+              "source": "src/row-bridge.ts#L97",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -3079,7 +3055,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L199",
+              "source": "src/row-bridge.ts#L198",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -3091,7 +3067,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L137",
+              "source": "src/row-bridge.ts#L136",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -3127,7 +3103,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L120",
+              "source": "src/row-bridge.ts#L119",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -3160,7 +3136,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L90",
+              "source": "src/row-bridge.ts#L89",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -3172,7 +3148,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L192",
+              "source": "src/row-bridge.ts#L191",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -3184,7 +3160,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L74",
+              "source": "src/row-bridge.ts#L73",
               "jsDocTags": [],
               "documentation": "A setRange/setBlock effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -3196,7 +3172,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L177",
+              "source": "src/row-bridge.ts#L176",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -3217,7 +3193,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L168",
+              "source": "src/row-bridge.ts#L167",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -3229,7 +3205,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L106",
+              "source": "src/row-bridge.ts#L105",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -3253,7 +3229,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L867",
+              "source": "src/row-bridge.ts#L866",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -3265,7 +3241,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L149",
+              "source": "src/row-bridge.ts#L148",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -5393,7 +5369,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L859",
+              "source": "src/row-bridge.ts#L858",
               "jsDocTags": [],
               "documentation": "Create a typed bridge while preserving row and identity inference.",
               "memberDocs": []
@@ -5753,7 +5729,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L313",
+              "source": "src/row-bridge.ts#L312",
               "jsDocTags": [],
               "documentation": "Projects canonical document transactions into host-owned row changes.\n\nThe bridge only owns compact data-space identity arrays. It never writes to\n`defaultRows`, never renders, and never creates a second document store.",
               "memberDocs": [
@@ -5794,7 +5770,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L82",
+              "source": "src/row-bridge.ts#L81",
               "jsDocTags": [],
               "documentation": "A clearRange effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -5818,7 +5794,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L156",
+              "source": "src/row-bridge.ts#L155",
               "jsDocTags": [],
               "documentation": "Every possible projection produced by a row bridge.",
               "memberDocs": []
@@ -5830,7 +5806,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L98",
+              "source": "src/row-bridge.ts#L97",
               "jsDocTags": [],
               "documentation": "A fill-series transaction effect.",
               "memberDocs": []
@@ -5842,7 +5818,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L199",
+              "source": "src/row-bridge.ts#L198",
               "jsDocTags": [],
               "documentation": "Callback accepted by imperative and framework adapters.",
               "memberDocs": []
@@ -5854,7 +5830,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L137",
+              "source": "src/row-bridge.ts#L136",
               "jsDocTags": [],
               "documentation": "A document operation that needs a host-side action rather than row mutation.",
               "memberDocs": []
@@ -5890,7 +5866,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L120",
+              "source": "src/row-bridge.ts#L119",
               "jsDocTags": [],
               "documentation": "A document operation that changes workbook or column metadata.",
               "memberDocs": []
@@ -5923,7 +5899,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L90",
+              "source": "src/row-bridge.ts#L89",
               "jsDocTags": [],
               "documentation": "A paste transaction effect. A paste can contain multiple canonical patches.",
               "memberDocs": []
@@ -5935,7 +5911,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L192",
+              "source": "src/row-bridge.ts#L191",
               "jsDocTags": [],
               "documentation": "Result of projection or reconciliation.",
               "memberDocs": []
@@ -5947,7 +5923,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L74",
+              "source": "src/row-bridge.ts#L73",
               "jsDocTags": [],
               "documentation": "A setRange/setBlock effect expanded to its exact changed cells.",
               "memberDocs": []
@@ -5959,7 +5935,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L177",
+              "source": "src/row-bridge.ts#L176",
               "jsDocTags": [],
               "documentation": "Input to {@link RowBridge.reconcile}.",
               "memberDocs": [
@@ -5980,7 +5956,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L168",
+              "source": "src/row-bridge.ts#L167",
               "jsDocTags": [],
               "documentation": "Reconciliation status for a canonical transaction response.",
               "memberDocs": []
@@ -5992,7 +5968,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L106",
+              "source": "src/row-bridge.ts#L105",
               "jsDocTags": [],
               "documentation": "Stable row identity effects for insert, delete, and move operations.",
               "memberDocs": []
@@ -6016,7 +5992,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L867",
+              "source": "src/row-bridge.ts#L866",
               "jsDocTags": [],
               "documentation": "Compute a deterministic identity for a canonical transaction.",
               "memberDocs": []
@@ -6028,7 +6004,7 @@
               "owners": [
                 "src/row-bridge.ts"
               ],
-              "source": "src/row-bridge.ts#L149",
+              "source": "src/row-bridge.ts#L148",
               "jsDocTags": [],
               "documentation": "An explicit projection record for an operation with no row-space meaning.",
               "memberDocs": []
@@ -6610,7 +6586,7 @@
               "owners": [
                 "src/worker.ts"
               ],
-              "source": "src/worker.ts#L256",
+              "source": "src/worker.ts#L259",
               "jsDocTags": [],
               "documentation": "Build the worker-side protocol handler. Keeping the mutable render state\ninside the returned closure lets tests exercise the real message contract\nwithout booting a browser Worker.",
               "memberDocs": []
@@ -6618,13 +6594,13 @@
             {
               "name": "WorkerAcknowledgement",
               "kind": "type",
-              "signature": "export type WorkerAcknowledgement = { type: \"painted\" };",
+              "signature": "export type WorkerAcknowledgement = | { type: \"ready\" } | { type: \"fatal\"; reason: string } | { type: \"painted\" };",
               "owners": [
                 "src/worker.ts"
               ],
               "source": "src/worker.ts#L249",
               "jsDocTags": [],
-              "documentation": "Acknowledgement posted back to the sender after a frame actually painted.",
+              "documentation": "Lifecycle and frame acknowledgements posted back to the sender.",
               "memberDocs": []
             }
           ]
@@ -9411,7 +9387,7 @@
                 },
                 {
                   "name": "getWindow",
-                  "documentation": "One bulk read of a rectangular window for the renderer. Returns\ncontiguous typed arrays (row-major over `rows x cols`) plus the unique\nstrings referenced by the window, so the host paints without crossing\nthe boundary per cell."
+                  "documentation": "One bulk read of a rectangular window for the renderer. Returns\ncontiguous packed cell data (row-major over `rows x cols`) plus the\nunique strings referenced by the window, so the host paints without\ncrossing the boundary per cell."
                 },
                 {
                   "name": "getWindowRows",
@@ -9563,7 +9539,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L409",
+              "source": "pkg/sheetwrite_wasm.d.ts#L384",
               "jsDocTags": [],
               "documentation": "Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -9571,11 +9547,11 @@
             {
               "name": "InitOutput",
               "kind": "interface",
-              "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_cellout_free: (a: number, b: number) => void; readonly __wbg_cellstore_free: (a: number, b: number) => void; readonly __wbg_distinctcolumn_free: (a: number, b: number) => void; readonly __wbg_rangesnapshot_free: (a: number, b: number) => void; readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void; readonly __wbg_windowview_free: (a: number, b: number) => void; readonly cellout_kind: (a: number) => number; readonly cellout_num: (a: number) => number; readonly cellout_string: (a: number) => [number, number]; readonly cellout_style: (a: number) => number; readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void; readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_addSheet: (a: number, b: number, c: number) => number; readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number; readonly cellstore_beginMutation: (a: number) => bigint; readonly cellstore_beginPageLoad: (a: number) => void; readonly cellstore_canDirtyCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureReferences: (a: number, b: number, c: number) => number; readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number; readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void; readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_colCount: (a: number, b: number) => number; readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_compactStringStorage: (a: number) => void; readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_dirtyRevision: (a: number, b: number, c: number, d: number) => bigint; readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number; readonly cellstore_endMutation: (a: number) => void; readonly cellstore_endPageLoad: (a: number) => void; readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number]; readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number]; readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_hydratePageNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void; readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_isFullyLoaded: (a: number, b: number) => number; readonly cellstore_isPaged: (a: number, b: number) => number; readonly cellstore_isSheetAlive: (a: number, b: number) => number; readonly cellstore_markCellCleanRevision: (a: number, b: number, c: number, d: number, e: bigint) => number; readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_memoryStats: (a: number) => [number, number]; readonly cellstore_new: () => number; readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number]; readonly cellstore_pagedStats: (a: number, b: number) => [number, number]; readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]; readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_poolStrings: (a: number, b: number, c: number) => [number, number]; readonly cellstore_queryResourceStats: (a: number) => [number, number]; readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_recompute: (a: number, b: number) => void; readonly cellstore_recomputeChanged: (a: number) => void; readonly cellstore_recomputeVolatile: (a: number, b: number) => number; readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number]; readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number; readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeSheet: (a: number, b: number) => number; readonly cellstore_removeTable: (a: number, b: number, c: number) => number; readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void; readonly cellstore_resetQueryResourceStats: (a: number) => void; readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number; readonly cellstore_rowCount: (a: number, b: number) => number; readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_setBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number) => number; readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void; readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number; readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number; readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number]; readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number]; readonly cellstore_sortRows: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_spillOwnerCoordinates: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_styleIdAt: (a: number, b: number, c: number, d: number) => number; readonly cellstore_wasmCommittedBytes: (a: number) => number; readonly distinctcolumn_takeKinds: (a: number) => [number, number]; readonly distinctcolumn_takeNumbers: (a: number) => [number, number]; readonly distinctcolumn_takeTexts: (a: number) => [number, number]; readonly rangesnapshot_byteLength: (a: number) => number; readonly rangesnapshot_formulaOffsets: (a: number) => [number, number]; readonly rangesnapshot_formulaSources: (a: number) => [number, number]; readonly rangesnapshot_kinds: (a: number) => [number, number]; readonly rangesnapshot_referenceOffsets: (a: number) => [number, number]; readonly rangesnapshot_referenceTargets: (a: number) => [number, number]; readonly rangesnapshot_styleIds: (a: number) => [number, number]; readonly sourcesnapshot_byteLength: (a: number) => number; readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number]; readonly sourcesnapshot_formulaSources: (a: number) => [number, number]; readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number]; readonly sourcesnapshot_referenceTargets: (a: number) => [number, number]; readonly sourcesnapshot_spillDerived: (a: number) => [number, number]; readonly windowview_nCols: (a: number) => number; readonly windowview_nRows: (a: number) => number; readonly windowview_takeCondMatches: (a: number) => [number, number]; readonly windowview_takeStringIds: (a: number) => [number, number]; readonly windowview_takeStringIndex: (a: number) => [number, number]; readonly windowview_takeStrings: (a: number) => [number, number]; readonly windowview_takeStyleDict: (a: number) => [number, number]; readonly windowview_takeStyleIndex: (a: number) => [number, number]; readonly windowview_takeKinds: (a: number) => [number, number]; readonly windowview_takeNumbers: (a: number) => [number, number]; readonly __wbindgen_malloc: (a: number, b: number) => number; readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __externref_table_alloc: () => number; readonly __externref_drop_slice: (a: number, b: number) => void; readonly __wbindgen_start: () => void; }",
+              "signature": "export interface InitOutput { readonly memory: WebAssembly.Memory; readonly __wbg_cellout_free: (a: number, b: number) => void; readonly __wbg_cellstore_free: (a: number, b: number) => void; readonly __wbg_distinctcolumn_free: (a: number, b: number) => void; readonly __wbg_rangesnapshot_free: (a: number, b: number) => void; readonly __wbg_sourcesnapshot_free: (a: number, b: number) => void; readonly __wbg_windowview_free: (a: number, b: number) => void; readonly cellout_kind: (a: number) => number; readonly cellout_num: (a: number) => number; readonly cellout_string: (a: number) => [number, number]; readonly cellout_style: (a: number) => number; readonly cellstore_acknowledgeRevision: (a: number, b: bigint) => void; readonly cellstore_addPagedSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_addRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_addSheet: (a: number, b: number, c: number) => number; readonly cellstore_aggregate: (a: number, b: number, c: number, d: number) => number; readonly cellstore_beginMutation: (a: number) => bigint; readonly cellstore_beginPageLoad: (a: number) => void; readonly cellstore_canDirtyCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_captureRange: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureReferences: (a: number, b: number, c: number) => number; readonly cellstore_captureSources: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_captureSourcesForRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_cellState: (a: number, b: number, c: number, d: number) => number; readonly cellstore_clearCell: (a: number, b: number, c: number, d: number, e: number) => void; readonly cellstore_clearRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_colCount: (a: number, b: number) => number; readonly cellstore_columnsFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_compactStringStorage: (a: number) => void; readonly cellstore_dataEdge: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_dataEdgeOrdered: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number; readonly cellstore_dirtyRevision: (a: number, b: number, c: number, d: number) => bigint; readonly cellstore_distinctValues: (a: number, b: number, c: number, d: number) => number; readonly cellstore_endMutation: (a: number) => void; readonly cellstore_endPageLoad: (a: number) => void; readonly cellstore_filterRows: (a: number, b: number, c: number, d: number, e: number) => [number, number]; readonly cellstore_filterRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number) => [number, number]; readonly cellstore_formulaMatrixResourceStats: (a: number) => [number, number]; readonly cellstore_formulaSource: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_getCell: (a: number, b: number, c: number, d: number) => number; readonly cellstore_getWindow: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_getWindowRows: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_hydratePageNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_hydratePageStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => void; readonly cellstore_insertCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_isFullyLoaded: (a: number, b: number) => number; readonly cellstore_isPaged: (a: number, b: number) => number; readonly cellstore_isSheetAlive: (a: number, b: number) => number; readonly cellstore_markCellCleanRevision: (a: number, b: number, c: number, d: number, e: bigint) => number; readonly cellstore_markRangeClean: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_memoryStats: (a: number) => [number, number]; readonly cellstore_new: () => number; readonly cellstore_pagedDirtyCoordinates: (a: number, b: number) => [number, number]; readonly cellstore_pagedStats: (a: number, b: number) => [number, number]; readonly cellstore_persistedCellData: (a: number, b: number) => [number, number]; readonly cellstore_pinRange: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_poolStrings: (a: number, b: number, c: number) => [number, number]; readonly cellstore_queryResourceStats: (a: number) => [number, number]; readonly cellstore_rangeFullyLoaded: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_rangeStyleIds: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_recompute: (a: number, b: number) => void; readonly cellstore_recomputeChanged: (a: number) => void; readonly cellstore_recomputeVolatile: (a: number, b: number) => number; readonly cellstore_referenceTarget: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_referencesTargeting: (a: number, b: number, c: number) => [number, number]; readonly cellstore_remapRangeStyles: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number; readonly cellstore_removeCols: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeNamedRange: (a: number, b: number, c: number, d: number) => number; readonly cellstore_removeRows: (a: number, b: number, c: number, d: number) => void; readonly cellstore_removeSheet: (a: number, b: number) => number; readonly cellstore_removeTable: (a: number, b: number, c: number) => number; readonly cellstore_renameSheet: (a: number, b: number, c: number, d: number, e: number, f: number) => number; readonly cellstore_resetFormulaMatrixResourceStats: (a: number) => void; readonly cellstore_resetQueryResourceStats: (a: number) => void; readonly cellstore_restoreRange: (a: number, b: number, c: number, d: number, e: number) => number; readonly cellstore_rowCount: (a: number, b: number) => number; readonly cellstore_search: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_setBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number) => number; readonly cellstore_setBool: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setColumnNumbers: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStrings: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setColumnStringsPacked: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => void; readonly cellstore_setConditionalRules: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => void; readonly cellstore_setFormula: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number; readonly cellstore_setNamedRange: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number; readonly cellstore_setNumber: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSheetName: (a: number, b: number, c: number, d: number, e: number, f: number) => void; readonly cellstore_setSparseBlock: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number, q: number, r: number, s: number, t: number, u: number, v: number, w: number, x: number) => number; readonly cellstore_setSpillBlockers: (a: number, b: number, c: number, d: number) => number; readonly cellstore_setString: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void; readonly cellstore_setTable: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number, m: number, n: number, o: number, p: number) => number; readonly cellstore_snapshotNumbers: (a: number, b: number) => [number, number]; readonly cellstore_snapshotTexts: (a: number, b: number) => [number, number]; readonly cellstore_sortRows: (a: number, b: number, c: number, d: number) => [number, number]; readonly cellstore_sortRowsMulti: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number]; readonly cellstore_spillAnchorCol: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillAnchorRow: (a: number, b: number, c: number, d: number) => number; readonly cellstore_spillDerivedMask: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_spillOwnerCoordinates: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number]; readonly cellstore_styleIdAt: (a: number, b: number, c: number, d: number) => number; readonly cellstore_wasmCommittedBytes: (a: number) => number; readonly distinctcolumn_takeKinds: (a: number) => [number, number]; readonly distinctcolumn_takeNumbers: (a: number) => [number, number]; readonly distinctcolumn_takeTexts: (a: number) => [number, number]; readonly rangesnapshot_byteLength: (a: number) => number; readonly rangesnapshot_formulaOffsets: (a: number) => [number, number]; readonly rangesnapshot_formulaSources: (a: number) => [number, number]; readonly rangesnapshot_kinds: (a: number) => [number, number]; readonly rangesnapshot_referenceOffsets: (a: number) => [number, number]; readonly rangesnapshot_referenceTargets: (a: number) => [number, number]; readonly rangesnapshot_styleIds: (a: number) => [number, number]; readonly sourcesnapshot_byteLength: (a: number) => number; readonly sourcesnapshot_formulaOffsets: (a: number) => [number, number]; readonly sourcesnapshot_formulaSources: (a: number) => [number, number]; readonly sourcesnapshot_referenceOffsets: (a: number) => [number, number]; readonly sourcesnapshot_referenceTargets: (a: number) => [number, number]; readonly sourcesnapshot_spillDerived: (a: number) => [number, number]; readonly windowview_nCols: (a: number) => number; readonly windowview_takeStrings: (a: number) => [number, number]; readonly windowview_takePacked: (a: number) => [number, number]; readonly windowview_nRows: (a: number) => number; readonly __wbindgen_malloc: (a: number, b: number) => number; readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number; readonly __wbindgen_externrefs: WebAssembly.Table; readonly __wbindgen_free: (a: number, b: number, c: number) => void; readonly __externref_table_alloc: () => number; readonly __externref_drop_slice: (a: number, b: number) => void; readonly __wbindgen_start: () => void; }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L411",
+              "source": "pkg/sheetwrite_wasm.d.ts#L386",
               "jsDocTags": [],
               "documentation": "Result of module initialization: the instantiated exports plus the shared linear memory.",
               "memberDocs": []
@@ -9587,7 +9563,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L558",
+              "source": "pkg/sheetwrite_wasm.d.ts#L527",
               "jsDocTags": [
                 "param",
                 "returns"
@@ -9650,7 +9626,7 @@
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
-              "source": "pkg/sheetwrite_wasm.d.ts#L548",
+              "source": "pkg/sheetwrite_wasm.d.ts#L517",
               "jsDocTags": [],
               "documentation": "Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`.",
               "memberDocs": []
@@ -9658,7 +9634,7 @@
             {
               "name": "WindowView",
               "kind": "class",
-              "signature": "class WindowView { free: () => void; nCols: number; nRows: number; takeCondMatches: () => Uint32Array; takeKinds: () => Uint8Array; takeNumbers: () => Float64Array; takeStringIds: () => Uint32Array; takeStringIndex: () => Int32Array; takeStrings: () => string[]; takeStyleDict: () => Uint32Array; takeStyleIndex: () => Uint32Array }",
+              "signature": "class WindowView { free: () => void; nCols: number; nRows: number; takePacked: () => Uint8Array; takeStrings: () => string[] }",
               "owners": [
                 "pkg/sheetwrite_wasm.d.ts"
               ],
@@ -9667,36 +9643,12 @@
               "documentation": "A bulk window of resolved cells, row-major over `n_rows x n_cols`.",
               "memberDocs": [
                 {
-                  "name": "takeCondMatches",
-                  "documentation": "Consume and return per-cell conditional-format rule bitmasks; empty\nwhen the sheet has no rules."
-                },
-                {
-                  "name": "takeKinds",
-                  "documentation": "Consume and return the per-cell tag array: 0 empty, 1 number, 2 string."
-                },
-                {
-                  "name": "takeNumbers",
-                  "documentation": "Consume and return per-cell numeric payloads (valid where kind == 1)."
-                },
-                {
-                  "name": "takeStringIds",
-                  "documentation": "Consume and return per-cell GLOBAL string-pool ids; `u32::MAX` means none."
-                },
-                {
-                  "name": "takeStringIndex",
-                  "documentation": "Consume and return per-cell indices into `strings` (string cells only)."
+                  "name": "takePacked",
+                  "documentation": "Consume the complete fixed-width window payload. The returned\n`Uint8Array` is copied by wasm-bindgen into JS-owned memory."
                 },
                 {
                   "name": "takeStrings",
-                  "documentation": "Consume and return unique strings referenced by this window."
-                },
-                {
-                  "name": "takeStyleDict",
-                  "documentation": "Consume and return the unique global style-dictionary ids referenced by\nthis window, in local-index order; the host maps each to a `CellStyle`."
-                },
-                {
-                  "name": "takeStyleIndex",
-                  "documentation": "Consume and return per-cell WINDOW-LOCAL style indices into the dict."
+                  "documentation": "Consume formula-error sentinel strings referenced by the packed data."
                 }
               ]
             }

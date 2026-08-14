@@ -192,10 +192,18 @@ describe("CI and release workflow contracts", () => {
     const projectByName = Object.fromEntries(
       (playwrightConfig.projects ?? []).map((project) => [project.name, project]),
     );
-    expect(Object.keys(projectByName)).toEqual(["chromium", "firefox", "webkit"]);
+    expect(Object.keys(projectByName)).toEqual([
+      "chromium",
+      "firefox",
+      "webkit",
+      "chromium-engine-dpr2",
+      "webkit-engine-dpr2",
+    ]);
     expect(projectByName.chromium?.grep).toBeUndefined();
     expect(String(projectByName.firefox?.grep)).toBe("/@portability/");
     expect(String(projectByName.webkit?.grep)).toBe("/@portability/");
+    expect(String(projectByName["chromium-engine-dpr2"]?.grep)).toBe("/@dpr2-render/");
+    expect(String(projectByName["webkit-engine-dpr2"]?.grep)).toBe("/@dpr2-render/");
   });
 
   it("applies the canonical JavaScript toolchain to the trusted publishing job", () => {

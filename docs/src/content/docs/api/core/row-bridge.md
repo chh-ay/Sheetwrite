@@ -12,7 +12,7 @@ The bridge only owns compact data-space identity arrays. It never writes to
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L313</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L312</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>5</span>

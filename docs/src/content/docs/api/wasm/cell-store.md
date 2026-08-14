@@ -310,9 +310,9 @@ getWindow: (sheet: number, row_start: number, row_end: number, cols: Uint32Array
 ```
 
 <p class="api-member-doc">One bulk read of a rectangular window for the renderer. Returns
-contiguous typed arrays (row-major over `rows x cols`) plus the unique
-strings referenced by the window, so the host paints without crossing
-the boundary per cell.</p>
+contiguous packed cell data (row-major over `rows x cols`) plus the
+unique strings referenced by the window, so the host paints without
+crossing the boundary per cell.</p>
 </details>
 
 <details class="api-member" id="cell-store-get-window-rows" data-pagefind-weight="1">

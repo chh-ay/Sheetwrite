@@ -8,7 +8,7 @@ description: "API reference for @sheetwrite/core."
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Declaration target</dt><dd><code>./dist/index.d.ts</code></dd></div>
-<div><dt>Exports</dt><dd>314</dd></div>
+<div><dt>Exports</dt><dd>312</dd></div>
 </dl>
 
 Source entry: `packages/core/src/index.ts`
@@ -37,18 +37,16 @@ Source entry: `packages/core/src/index.ts`
 <a class="api-symbol-card" href="/docs/api/core/xlsx-resource-error/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="class" aria-hidden="true">C</span><code>XlsxResourceError</code></span><span class="api-symbol-card__desc">Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data.</span></a>
 </div>
 
-### Functions <span class="api-count" data-pagefind-ignore>60</span>
+### Functions <span class="api-count" data-pagefind-ignore>58</span>
 
 <div class="api-symbol-grid">
 <a class="api-symbol-card" href="/docs/api/core/assert-runtime-resource-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>assertRuntimeResourceSnapshot</code></span><span class="api-symbol-card__desc">Reject overlap, negative values, and attempts to fold runtime observations into owner totals.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/assert-workbook-tables/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>assertWorkbookTables</code></span><span class="api-symbol-card__desc">Reject an invalid or oversized live workbook before table arrays are copied to WASM.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/cell-a1/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>cellA1</code></span><span class="api-symbol-card__desc">0-based (row, col) → A1 cell reference (0, 0 → &quot;A1&quot;).</span></a>
 <a class="api-symbol-card" href="/docs/api/core/cell-scalar-to-text/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>cellScalarToText</code></span><span class="api-symbol-card__desc">Spreadsheet display text for a resolved scalar.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/clone-cell-hyperlink/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>cloneCellHyperlink</code></span><span class="api-symbol-card__desc">Clone one validated hyperlink into an independent plain-data value.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/col-to-a1/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>colToA1</code></span><span class="api-symbol-card__desc">Column index (0-based) → A1 column label (0 → &quot;A&quot;, 26 → &quot;AA&quot;).</span></a>
 <a class="api-symbol-card" href="/docs/api/core/create-grid/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createGrid</code></span><span class="api-symbol-card__desc">Creates and mounts an imperative Grid in the supplied host element.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/create-grid-from-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createGridFromSnapshot</code></span><span class="api-symbol-card__desc">Mount a grid over a validated, non-dirty snapshot.</span></a>
-<a class="api-symbol-card" href="/docs/api/core/create-hyperlink-id/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createHyperlinkId</code></span><span class="api-symbol-card__desc">Produce a new stable identity for copied hyperlinks without trusting clipboard IDs.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/create-row-bridge/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createRowBridge</code></span><span class="api-symbol-card__desc">Create a typed bridge while preserving row and identity inference.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/create-runtime-resource-snapshot/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>createRuntimeResourceSnapshot</code></span><span class="api-symbol-card__desc">Build and validate one operation-phase snapshot without double-counting runtime observations.</span></a>
 <a class="api-symbol-card" href="/docs/api/core/date-to-serial/"><span class="api-symbol-card__head"><span class="api-symbol-badge" data-kind="function" aria-hidden="true">F</span><code>dateToSerial</code></span><span class="api-symbol-card__desc">Convert a real UTC Date to the Excel 1900-system serial.</span></a>

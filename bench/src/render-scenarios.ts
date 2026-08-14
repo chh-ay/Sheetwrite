@@ -1,23 +1,33 @@
+import { OffsetIndex } from "../../packages/core/src/fenwick.js";
 import type { ColumnarDataset } from "./dataset.js";
 import { logicalValueChecksum } from "./dataset.js";
 import {
+  ALL_RENDER_SCENARIOS,
+  createWindowTransferMetrics,
   type FailedScenario,
   type MeasuredSample,
   type MemoryDelta,
   type MergeIndexResourceMetrics,
-  RENDER_SCENARIOS,
   type RenderResourceMetrics,
   type ScenarioId,
   type ScenarioIdentity,
   type ScenarioResult,
+  scenarioDataValidity,
   scenarioGroup,
   type ValidationObservation,
+  WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
+  WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
+  type WindowTransferMetrics,
 } from "./render-protocol.js";
 import { summarizeFinite } from "./stats.js";
 
 const SCROLL_STEP = 50;
 const EDIT_VALUE = "Benchmark edit";
 const ALTER_COUNT = 5;
+const FRACTIONAL_SCROLL_STEP = 1;
+const LONG_SCROLL_STEP_PX = 448;
+const LONG_SCROLL_ROW_STRIDE = 16;
+const LONG_SCROLL_MAX_STEPS = 1_100;
 
 export interface CellSelection {
   readonly row: number;
@@ -30,6 +40,40 @@ export interface ScrollObservation {
   readonly maximumTop: number;
   readonly maximumLeft: number;
   readonly firstVisibleRow: number;
+  readonly devicePixelRatio: number;
+}
+export interface GeometryObservation {
+  readonly count: number;
+  readonly backingStoreBytes: number;
+  readonly totalHeight: number;
+  readonly middleRow: number;
+  readonly middleTop: number;
+  readonly lastRow: number;
+  readonly lastTop: number;
+}
+export function measureUnresizedMillionRowGeometry(): GeometryObservation {
+  const index = new OffsetIndex(1_000_000, 28);
+  const middle = index.rowAtOffset(14_000_005);
+  const last = index.rowAtOffset(index.totalHeight - 1);
+  return {
+    count: index.count,
+    backingStoreBytes: index.backingStoreBytes,
+    totalHeight: index.totalHeight,
+    middleRow: middle.row,
+    middleTop: middle.top,
+    lastRow: last.row,
+    lastTop: last.top,
+  };
+}
+
+export type WindowReadDiagnosticMode = "baseline" | "reuse-decoded-view-upper-bound";
+
+export interface WindowTransferCounters {
+  readonly logicalFrames: number;
+  readonly windowReadRequests: number;
+  readonly logicalWindowReads: number;
+  readonly copiedBytes: number;
+  readonly outputAllocationEvents: number;
 }
 
 /** Repository-owned structural surface shared by both browser engines. */
@@ -58,10 +102,18 @@ export interface RenderBenchAdapter {
   repaint(): void;
   formattedSentinels(): readonly [string, string];
   formatResources(): RenderResourceMetrics;
+  installFormulaDense(): void;
+  clearFormulaDense(): void;
+  installTextHeavy(rowCount: number): void;
+  clearTextHeavy(): void;
+  measureUnresizedMillionRowGeometry(): GeometryObservation;
   installMergeHeavy(): void;
   clearMergeHeavy(): void;
   resetMergeResources(): void;
   mergeResources(): MergeIndexResourceMetrics;
+  setWindowReadDiagnosticMode(mode: WindowReadDiagnosticMode): void;
+  resetWindowTransferCounters(): void;
+  windowTransferCounters(): WindowTransferCounters;
   destroy(): void;
 }
 
@@ -79,6 +131,8 @@ export class ScenarioValidationError extends Error {
 }
 
 interface ScenarioActions {
+  readonly setup?: () => void;
+  readonly measureWindowTransfer?: boolean;
   readonly prepare: () => void;
   readonly action: () => void;
   readonly cleanup: () => void;
@@ -209,6 +263,208 @@ function scenarioActions(
   const middleCol = Math.floor(adapter.colCount / 2);
   const lastRow = dataset.rowCount - 1;
   const lastCol = adapter.colCount - 1;
+
+  if (
+    scenarioId === WINDOW_TRANSFER_BASELINE_SCENARIO_ID ||
+    scenarioId === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID
+  ) {
+    const upperBound = scenarioId === WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID;
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => adapter.scrollBy("top", SCROLL_STEP);
+    return {
+      setup: () => {
+        adapter.setWindowReadDiagnosticMode("baseline");
+        prepare();
+        adapter.setWindowReadDiagnosticMode(
+          upperBound ? "reuse-decoded-view-upper-bound" : "baseline",
+        );
+      },
+      measureWindowTransfer: true,
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          adapter.resetWindowTransferCounters();
+          action();
+          const counters = adapter.windowTransferCounters();
+          checkpoint(
+            observations,
+            `${scenarioId} completes one coordinator paint`,
+            1,
+            counters.logicalFrames,
+          );
+          checkpoint(
+            observations,
+            `${scenarioId} requests one visible window`,
+            1,
+            counters.windowReadRequests,
+          );
+          if (upperBound) {
+            checkpoint(
+              observations,
+              `${scenarioId} deliberately reuses pixel-data-invalid decoded data`,
+              JSON.stringify({
+                logicalWindowReads: 0,
+                copiedBytes: 0,
+                outputAllocationEvents: 0,
+              }),
+              JSON.stringify({
+                logicalWindowReads: counters.logicalWindowReads,
+                copiedBytes: counters.copiedBytes,
+                outputAllocationEvents: counters.outputAllocationEvents,
+              }),
+            );
+          } else {
+            checkpoint(
+              observations,
+              `${scenarioId} accounts for a fresh decoded window`,
+              true,
+              counters.logicalWindowReads === 1 &&
+                counters.copiedBytes > 0 &&
+                counters.outputAllocationEvents > 0,
+            );
+          }
+        } finally {
+          adapter.setWindowReadDiagnosticMode("baseline");
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "formula-dense.paint") {
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => adapter.repaint();
+    return {
+      setup: () => adapter.installFormulaDense(),
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          action();
+          checkpoint(
+            observations,
+            "formula-dense.paint resolves first visible formula",
+            Number(dataset.id[1]) + 1,
+            adapter.cellValue(1, 1),
+          );
+          checkpoint(
+            observations,
+            "formula-dense.paint resolves last visible formula column",
+            Number(dataset.id[1]) + 4,
+            adapter.cellValue(1, 4),
+          );
+        } finally {
+          adapter.clearFormulaDense();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "text-heavy.long-scroll") {
+    const steps = Math.min(
+      LONG_SCROLL_MAX_STEPS,
+      Math.max(1, Math.floor(dataset.rowCount / LONG_SCROLL_ROW_STRIDE) - 1),
+    );
+    const installedRows = Math.min(dataset.rowCount - 1, steps * LONG_SCROLL_ROW_STRIDE + 64);
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => {
+      for (let step = 0; step < steps; step++) {
+        adapter.scrollBy("top", LONG_SCROLL_STEP_PX);
+      }
+    };
+    return {
+      setup: () => adapter.installTextHeavy(installedRows),
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          prepare();
+          const before = adapter.scrollObservation();
+          action();
+          const after = adapter.scrollObservation();
+          checkpoint(
+            observations,
+            "text-heavy.long-scroll advances through multiple row windows",
+            true,
+            after.firstVisibleRow > before.firstVisibleRow,
+          );
+          const observedRow = Math.min(installedRows, Math.max(1, after.firstVisibleRow));
+          checkpoint(
+            observations,
+            "text-heavy.long-scroll retains unique long text",
+            true,
+            String(adapter.cellValue(observedRow, 2)).startsWith("diagnostic-long-"),
+          );
+        } finally {
+          adapter.clearTextHeavy();
+        }
+      },
+    };
+  }
+
+  if (scenarioId === "scroll-fractional.same-window") {
+    const prepare = (): void => adapter.prepareScroll("top", false);
+    const action = (): void => adapter.scrollBy("top", FRACTIONAL_SCROLL_STEP);
+    return {
+      prepare,
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        prepare();
+        const before = adapter.scrollObservation();
+        action();
+        const after = adapter.scrollObservation();
+        const deviceDelta = (after.top - before.top) * after.devicePixelRatio;
+        checkpoint(
+          observations,
+          "scroll-fractional.same-window uses a fractional device-pixel delta",
+          true,
+          after.top === Math.min(before.maximumTop, before.top + FRACTIONAL_SCROLL_STEP) &&
+            !Number.isInteger(deviceDelta),
+        );
+        checkpoint(
+          observations,
+          "scroll-fractional.same-window keeps the logical row window",
+          before.firstVisibleRow,
+          after.firstVisibleRow,
+        );
+      },
+    };
+  }
+
+  if (scenarioId === "geometry-unresized.1m") {
+    let observed: GeometryObservation | undefined;
+    const action = (): void => {
+      observed = adapter.measureUnresizedMillionRowGeometry();
+    };
+    return {
+      prepare: () => {},
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        action();
+        checkpoint(
+          observations,
+          "geometry-unresized.1m builds exact uniform geometry",
+          JSON.stringify({
+            count: 1_000_000,
+            backingStoreBytes: 0,
+            totalHeight: 28_000_000,
+            middleRow: 500_000,
+            middleTop: 14_000_000,
+            lastRow: 999_999,
+            lastTop: 27_999_972,
+          }),
+          JSON.stringify(observed),
+        );
+      },
+    };
+  }
 
   if (scenarioId === "formatted-paint.top-left") {
     const originalDate = dataset.date[0]!;
@@ -529,11 +785,23 @@ function scenarioActions(
   };
 }
 
-function aggregateSample(actions: ScenarioActions, minimumDurationMs: number): MeasuredSample {
+function aggregateSample(
+  adapter: RenderBenchAdapter,
+  actions: ScenarioActions,
+  minimumDurationMs: number,
+): MeasuredSample {
   let durationMs = 0;
   let operationCount = 0;
+  const transferCounters = {
+    logicalFrames: 0,
+    windowReadRequests: 0,
+    logicalWindowReads: 0,
+    copiedBytes: 0,
+    outputAllocationEvents: 0,
+  };
   do {
     actions.prepare();
+    if (actions.measureWindowTransfer) adapter.resetWindowTransferCounters();
     const started = performance.now();
     let operationError: unknown;
     try {
@@ -542,6 +810,18 @@ function aggregateSample(actions: ScenarioActions, minimumDurationMs: number): M
       operationError = error;
     }
     const elapsed = performance.now() - started;
+    if (actions.measureWindowTransfer && operationError === undefined) {
+      try {
+        const observed = adapter.windowTransferCounters();
+        transferCounters.logicalFrames += observed.logicalFrames;
+        transferCounters.windowReadRequests += observed.windowReadRequests;
+        transferCounters.logicalWindowReads += observed.logicalWindowReads;
+        transferCounters.copiedBytes += observed.copiedBytes;
+        transferCounters.outputAllocationEvents += observed.outputAllocationEvents;
+      } catch (error) {
+        operationError = error;
+      }
+    }
     try {
       actions.cleanup();
     } catch (cleanupError) {
@@ -565,6 +845,9 @@ function aggregateSample(actions: ScenarioActions, minimumDurationMs: number): M
     durationMs,
     operationCount,
     perOperationMs: durationMs / operationCount,
+    ...(actions.measureWindowTransfer
+      ? { windowTransfer: createWindowTransferMetrics(transferCounters) }
+      : {}),
   };
 }
 
@@ -599,9 +882,10 @@ export function runRenderScenario(
   scenarioId: ScenarioId,
   options: ScenarioRunOptions,
 ): ScenarioResult {
-  if (!RENDER_SCENARIOS.some((scenario) => scenario.id === scenarioId)) {
+  if (!ALL_RENDER_SCENARIOS.some((scenario) => scenario.id === scenarioId)) {
     throw new RangeError(`unknown render scenario: ${scenarioId}`);
   }
+  const dataValidity = scenarioDataValidity(scenarioId);
   const identity: ScenarioIdentity = {
     runId: options.runId,
     round: options.round,
@@ -609,6 +893,7 @@ export function runRenderScenario(
     rows: dataset.rowCount,
     scenarioId,
     group: scenarioGroup(scenarioId),
+    ...(dataValidity === undefined ? {} : { dataValidity }),
   };
   const actions = scenarioActions(scenarioId, adapter, dataset);
   const validation: ValidationObservation[] = [];
@@ -619,15 +904,19 @@ export function runRenderScenario(
   try {
     options.onStage?.("validate");
     validateCanonicalState(adapter, dataset, validation);
+    actions.setup?.();
     stage = "warmup";
     options.onStage?.("warmup");
     for (let index = 0; index < options.warmupSamples; index++) {
-      aggregateSample(actions, options.minimumSampleDurationMs);
+      aggregateSample(adapter, actions, options.minimumSampleDurationMs);
     }
     stage = "measure";
     options.onStage?.("measure");
     for (let index = 0; index < options.measuredSamples; index++) {
-      rawSamples.push({ ...aggregateSample(actions, options.minimumSampleDurationMs), index });
+      rawSamples.push({
+        ...aggregateSample(adapter, actions, options.minimumSampleDurationMs),
+        index,
+      });
     }
     stage = "validate";
     options.onStage?.("validate");
@@ -635,6 +924,25 @@ export function runRenderScenario(
     validateCanonicalState(adapter, dataset, validation);
     const afterBytes = usedJsHeapBytes();
     const summary = summarizeFinite(rawSamples.map((sample) => sample.perOperationMs));
+    let windowTransfer: WindowTransferMetrics | undefined;
+    if (actions.measureWindowTransfer) {
+      const metrics = rawSamples.map((sample) => {
+        if (!sample.windowTransfer) {
+          throw new ScenarioValidationError("window-transfer sample counters are missing");
+        }
+        return sample.windowTransfer;
+      });
+      windowTransfer = createWindowTransferMetrics({
+        logicalFrames: metrics.reduce((sum, entry) => sum + entry.logicalFrames, 0),
+        windowReadRequests: metrics.reduce((sum, entry) => sum + entry.windowReadRequests, 0),
+        logicalWindowReads: metrics.reduce((sum, entry) => sum + entry.logicalWindowReads, 0),
+        copiedBytes: metrics.reduce((sum, entry) => sum + entry.copiedBytes, 0),
+        outputAllocationEvents: metrics.reduce(
+          (sum, entry) => sum + entry.outputAllocationEvents,
+          0,
+        ),
+      });
+    }
     return {
       ...identity,
       status: "success",
@@ -647,6 +955,7 @@ export function runRenderScenario(
       memory: memoryDelta(beforeBytes, afterBytes),
       resources: adapter.formatResources(),
       mergeResources: adapter.mergeResources(),
+      ...(windowTransfer === undefined ? {} : { windowTransfer }),
     };
   } catch (error) {
     return failedScenario(

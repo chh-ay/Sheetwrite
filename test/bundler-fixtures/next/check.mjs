@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
+import { attributeEntry, attributionProvenance } from "../module-attribution.mjs";
 
 const repositoryRoot = resolve("../../..");
 const nextRoot = resolve(".next");
@@ -26,31 +27,63 @@ const wasm = staticAssets.filter((path) => path.endsWith(".wasm"));
 if (wasm.length !== 1)
   throw new Error(`Expected one browser Next.js WASM asset, got ${wasm.length}`);
 const selected = [...new Set(staticAssets)].sort();
-const html = await readFile(resolve("out/index.html"), "utf8");
-const initialUrls = new Set(
-  [...html.matchAll(/(?:src|href)="([^"]+\.(?:css|js|wasm)(?:\?[^"]*)?)"/g)].map((match) =>
-    match[1].split("?")[0].replace(/^\/_next\//, ""),
-  ),
+function initialUrls(html) {
+  return new Set(
+    [...html.matchAll(/(?:src|href)="([^"]+\.(?:css|js|wasm)(?:\?[^"]*)?)"/g)].map((match) =>
+      match[1].split("?")[0].replace(/^\/_next\//, ""),
+    ),
+  );
+}
+
+const lifecycleInitialUrls = initialUrls(await readFile(resolve("out/index.html"), "utf8"));
+const attributionHtml = await readFile(resolve("out/attribution.html"), "utf8").catch(() =>
+  readFile(resolve("out/attribution/index.html"), "utf8"),
 );
+const attributionInitialUrls = initialUrls(attributionHtml);
 const assets = selected.map((path) => {
   const nextRelative = relative(nextRoot, path).replaceAll("\\", "/");
   const kind = path.endsWith(".js") ? "javascript" : path.endsWith(".css") ? "css" : "wasm";
-  const isInitial = kind === "wasm" || initialUrls.has(nextRelative);
+  const roles = [];
+  if (kind === "wasm" || lifecycleInitialUrls.has(nextRelative)) roles.push("core-initial");
+  if (attributionInitialUrls.has(nextRelative)) roles.push("core-attribution-initial");
+  if (roles.length === 0) roles.push("next-async");
   return {
     path: relative(repositoryRoot, path).replaceAll("\\", "/"),
     kind,
-    owner: isInitial ? "core-initial" : "next-async",
-    roles: [isInitial ? "core-initial" : "next-async"],
+    owner: roles.length === 1 ? roles[0] : `shared:${roles.join("+")}`,
+    roles,
   };
 });
-if (!assets.some((asset) => asset.kind === "javascript" && asset.owner === "core-initial")) {
+if (!assets.some((asset) => asset.kind === "javascript" && asset.roles.includes("core-initial"))) {
   throw new Error("Next.js manifest identified no initial browser JavaScript");
 }
+const attributionAssetFiles = selected
+  .map((path) => relative(nextRoot, path).replaceAll("\\", "/"))
+  .filter((path) => path.endsWith(".js") && attributionInitialUrls.has(path));
+const attribution = [
+  await attributeEntry({
+    assetFiles: attributionAssetFiles,
+    bundler: "next",
+    eagerImports: ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
+    entry: "app/attribution/page.tsx",
+    name: "core-first-paint",
+    opaqueAssetFiles: attributionAssetFiles.filter((path) =>
+      /(?:^|\/)polyfills-[^/]+\.js$/.test(path),
+    ),
+    repositoryRoot,
+    root: nextRoot,
+  }),
+];
 const evidence = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   bundler: "next",
   version: packageManifest.dependencies.next,
   assets,
+  provenance: attributionProvenance({
+    minifier: "next-swc",
+    version: packageManifest.dependencies.next,
+  }),
+  attribution,
 };
 const evidencePath = resolve(repositoryRoot, "test-results/bundlers/next.json");
 await mkdir(resolve(evidencePath, ".."), { recursive: true });

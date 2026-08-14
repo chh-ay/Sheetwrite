@@ -22,12 +22,12 @@ import type { Store } from "./types/store.js";
  * file is reopened in Excel/Sheets. Numeric values are legitimate data and pass
  * through untouched — a negative number is a number, not an attack vector.
  */
-export function safeText(value: CellScalar): string {
+function safeText(value: CellScalar): string {
   return typeof value === "string" ? neutralizeInjection(value) : cellScalarToText(value);
 }
 
 /** Harden a column header (always text) exactly as a text cell value. */
-export function safeHeader(header: string): string {
+function safeHeader(header: string): string {
   return neutralizeInjection(header);
 }
 

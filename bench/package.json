@@ -1,6 +1,6 @@
 {
   "name": "@sheetwrite/bench",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "type": "module",
   "description": "Performance comparison benchmarks: Sheetwrite vs Handsontable.",
@@ -20,6 +20,7 @@
     "bench:resource:smoke": "bun run src/resource-bench.ts --smoke",
     "bench:render:prepare": "cd .. && bun run build:wasm && bun run --filter '@sheetwrite/core' build",
     "bench:render": "bun run src/render-driver.ts",
+    "bench:render:diagnostic": "bun run src/render-driver.ts --scenario-set diagnostic --engine sheetwrite",
     "bench:render:smoke": "bun run src/render-driver.ts --smoke",
     "bench:render:validate": "bun run src/render-driver.ts --validate results/render-results.json --gate-mode full",
     "bench:xlsx": "bun run src/xlsx-bench.ts",

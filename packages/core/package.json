@@ -1,6 +1,6 @@
 {
   "name": "@sheetwrite/core",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "type": "module",
   "description": "Framework-agnostic, canvas-rendered spreadsheet grid core.",
   "license": "MIT",
@@ -57,7 +57,8 @@
     "./shell.css": "./shell.css"
   },
   "files": [
-    "dist",
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
     "styles.css",
     "shell.css"
   ],

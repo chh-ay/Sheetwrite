@@ -9,7 +9,7 @@ A clearRange effect expanded to its exact changed cells.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L82</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L81</code></dd></div>
 </dl>
 
 ## Members <span class="api-count" data-pagefind-ignore>10</span>

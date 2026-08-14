@@ -1,10 +1,12 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
+import { attributeEntry, attributionProvenance } from "../module-attribution.mjs";
 
 const repositoryRoot = resolve("../../..");
 const root = resolve("dist");
 const manifest = JSON.parse(await readFile(resolve(root, ".vite/manifest.json"), "utf8"));
 const packageManifest = JSON.parse(await readFile("package.json", "utf8"));
+const packageLock = JSON.parse(await readFile("package-lock.json", "utf8"));
 const rolesByFile = new Map();
 const kindByFile = new Map();
 const initialRoles = ["core-initial", "react-initial", "svelte-initial", "vue-initial"];
@@ -82,8 +84,11 @@ const entryRoles = {
   "xlsx.html": "xlsx-loader-initial",
 };
 const defaultInitialChunks = new Set();
+const staticGraphsByHtml = new Map();
 for (const [html, role] of Object.entries(entryRoles)) {
-  for (const key of staticGraph(findEntry(html))) {
+  const graph = staticGraph(findEntry(html));
+  staticGraphsByHtml.set(html, graph);
+  for (const key of graph) {
     addChunk(key, role);
     if (initialRoles.includes(role)) defaultInitialChunks.add(key);
   }
@@ -157,11 +162,30 @@ const assets = publicFiles.map((file) => {
     roles,
   };
 });
+const coreGraph = staticGraphsByHtml.get("index.html");
+if (coreGraph === undefined) throw new Error("Vite core entry graph was not recorded");
+const attribution = [
+  await attributeEntry({
+    assetFiles: [...coreGraph]
+      .map((key) => manifest[key]?.file)
+      .filter((file) => typeof file === "string" && file.endsWith(".js")),
+    bundler: "vite",
+    eagerImports: ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
+    entry: "index.html",
+    name: "core-first-paint",
+    repositoryRoot,
+    root,
+  }),
+];
+const esbuildVersion = packageLock.packages?.["node_modules/esbuild"]?.version;
+if (typeof esbuildVersion !== "string") throw new Error("Vite fixture lock is missing esbuild");
 const evidence = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   bundler: "vite",
   version: packageManifest.dependencies.vite,
   assets,
+  provenance: attributionProvenance({ minifier: "esbuild", version: esbuildVersion }),
+  attribution,
 };
 const evidencePath = resolve(repositoryRoot, "test-results/bundlers/vite.json");
 await mkdir(resolve(evidencePath, ".."), { recursive: true });

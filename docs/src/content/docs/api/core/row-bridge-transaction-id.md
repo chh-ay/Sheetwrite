@@ -9,7 +9,7 @@ Compute a deterministic identity for a canonical transaction.
 
 <dl class="api-metadata" data-pagefind-ignore>
 <div><dt>Package</dt><dd><code>@sheetwrite/core</code></dd></div>
-<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L867</code></dd></div>
+<div><dt>Source</dt><dd><code>packages/core/src/row-bridge.ts#L866</code></dd></div>
 </dl>
 
 ## Declaration

@@ -1,6 +1,7 @@
 import {
   type Column,
   createGrid,
+  type DocumentOp,
   type Grid,
   initSheetwrite,
   type Workbook,
@@ -18,11 +19,13 @@ import {
   getNumberFormatResourceStatsForTest,
   resetNumberFormatResourcesForTest,
 } from "../../packages/core/src/number-format.js";
+import type { InstrumentedVisibleWindowView } from "../../packages/core/src/store/window-reader.js";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
 import { COLUMNS, type ColumnarDataset, datasetChecksum, makeColumnar, toAoA } from "./dataset.js";
 import { createHandsontable } from "./handsontable-runtime.js";
 import {
+  ALL_RENDER_SCENARIOS,
   type BrowserCombinationResult,
   type EngineId,
   type FailedScenario,
@@ -32,27 +35,38 @@ import {
   RENDER_SCENARIOS,
   RENDER_VIEWPORT,
   type RenderResourceMetrics,
+  type ScenarioId,
   type ScenarioResult,
+  WINDOW_TRANSFER_SCENARIO_IDS,
 } from "./render-protocol.js";
 import {
   type CellSelection,
+  type GeometryObservation,
+  measureUnresizedMillionRowGeometry,
   type RenderBenchAdapter,
   runRenderScenario,
   type ScrollObservation,
+  type WindowReadDiagnosticMode,
+  type WindowTransferCounters,
 } from "./render-scenarios.js";
 
 const SHEET = "bench";
 const SHEETWRITE_ROW_HEIGHT = 28;
 const HANDSONTABLE_ROW_HEIGHT = 23;
+const FORMULA_DENSE_ROWS = 64;
+const TRANSACTION_CHUNK_SIZE = 8_000;
+const LONG_TEXT_SUFFIX = "x".repeat(192);
 
 interface PageConfiguration {
   readonly engine: EngineId;
   readonly rows: number;
+  readonly scenarios: readonly ScenarioId[];
   readonly measuredSamples: number;
   readonly warmupSamples: number;
   readonly minimumSampleDurationMs: number;
   readonly runId: string;
   readonly round: number;
+  readonly windowTransferDiagnostic: boolean;
 }
 
 declare global {
@@ -92,6 +106,13 @@ function makeWorkbook(rowCount: number): Workbook {
   }));
   return { activeSheet: SHEET, sheets: [{ id: SHEET, name: "Bench", rowCount, columns }] };
 }
+function datasetValueAt(dataset: ColumnarDataset, row: number, col: number): string | number {
+  if (col === 0) return dataset.id[row]!;
+  if (col === 1) return dataset.date[row]!;
+  if (col === 2) return dataset.customer[row]!;
+  if (col === 3) return dataset.city[row]!;
+  return dataset.amount[row]!;
+}
 
 class SheetwriteAdapter implements RenderBenchAdapter {
   readonly id = "sheetwrite" as const;
@@ -100,8 +121,23 @@ class SheetwriteAdapter implements RenderBenchAdapter {
   private grid!: Grid;
   private host!: HTMLElement;
   private readonly data: { rowCount: number; columns: Record<string, ArrayLike<string | number>> };
-
-  constructor(dataset: ColumnarDataset) {
+  private readonly dataset: ColumnarDataset;
+  private formulaDenseRows = 0;
+  private textHeavyRows = 0;
+  private windowReadDiagnosticMode: WindowReadDiagnosticMode = "baseline";
+  private priorDecodedView: InstrumentedVisibleWindowView | undefined;
+  private windowTransferCountersState = {
+    logicalFrames: 0,
+    windowReadRequests: 0,
+    logicalWindowReads: 0,
+    copiedBytes: 0,
+    outputAllocationEvents: 0,
+  };
+  constructor(
+    dataset: ColumnarDataset,
+    private readonly windowTransferDiagnostic: boolean,
+  ) {
+    this.dataset = dataset;
     this.initialRowCount = dataset.rowCount;
     this.data = {
       rowCount: dataset.rowCount,
@@ -121,6 +157,47 @@ class SheetwriteAdapter implements RenderBenchAdapter {
       workbook: makeWorkbook(this.initialRowCount),
       data: this.data,
     });
+    if (this.windowTransferDiagnostic) this.installWindowTransferDiagnostic();
+  }
+
+  private installWindowTransferDiagnostic(): void {
+    const originalRead = this.grid.store.getVisibleWindow.bind(this.grid.store);
+    this.grid.store.getVisibleWindow = ((...args) => {
+      this.windowTransferCountersState.windowReadRequests++;
+      if (this.windowReadDiagnosticMode === "reuse-decoded-view-upper-bound") {
+        if (!this.priorDecodedView) {
+          throw new Error("window-transfer upper bound has no prior decoded view");
+        }
+        return this.priorDecodedView;
+      }
+      const view = originalRead(...args) as InstrumentedVisibleWindowView;
+      const copiedBytes = view.ffiOutputBytes;
+      const outputAllocationEvents = view.ffiOutputAllocationEvents;
+      if (
+        typeof copiedBytes !== "number" ||
+        !Number.isSafeInteger(copiedBytes) ||
+        copiedBytes < 0 ||
+        typeof outputAllocationEvents !== "number" ||
+        !Number.isSafeInteger(outputAllocationEvents) ||
+        outputAllocationEvents <= 0
+      ) {
+        throw new Error("visible-window read omitted exact output transfer counters");
+      }
+      this.windowTransferCountersState.logicalWindowReads++;
+      this.windowTransferCountersState.copiedBytes += copiedBytes;
+      this.windowTransferCountersState.outputAllocationEvents += outputAllocationEvents;
+      this.priorDecodedView = view;
+      return view;
+    }) as typeof this.grid.store.getVisibleWindow;
+
+    const renderer = Reflect.get(this.grid, "renderer") as {
+      paint(view: InstrumentedVisibleWindowView): void;
+    };
+    const originalPaint = renderer.paint.bind(renderer);
+    renderer.paint = (view): void => {
+      this.windowTransferCountersState.logicalFrames++;
+      originalPaint(view);
+    };
   }
 
   isMountedAndAccessible(): boolean {
@@ -190,6 +267,7 @@ class SheetwriteAdapter implements RenderBenchAdapter {
       maximumTop: Math.max(0, element.scrollHeight - element.clientHeight),
       maximumLeft: Math.max(0, element.scrollWidth - element.clientWidth),
       firstVisibleRow: Math.floor(element.scrollTop / SHEETWRITE_ROW_HEIGHT),
+      devicePixelRatio: window.devicePixelRatio,
     };
   }
 
@@ -261,6 +339,79 @@ class SheetwriteAdapter implements RenderBenchAdapter {
     return getNumberFormatResourceStatsForTest();
   }
 
+  private applyPatches(patches: readonly DocumentOp[]): void {
+    for (let start = 0; start < patches.length; start += TRANSACTION_CHUNK_SIZE) {
+      this.grid.store.applyTransaction({
+        patches: patches.slice(start, start + TRANSACTION_CHUNK_SIZE),
+      });
+    }
+    this.grid.refresh();
+  }
+
+  installFormulaDense(): void {
+    this.formulaDenseRows = Math.min(FORMULA_DENSE_ROWS, this.initialRowCount - 1);
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.formulaDenseRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        patches.push({
+          op: "set",
+          addr: { sheet: SHEET, row, col },
+          value: { kind: "formula", src: `=A${row + 1}+${col}` },
+        });
+      }
+    }
+    this.applyPatches(patches);
+  }
+
+  clearFormulaDense(): void {
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.formulaDenseRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        patches.push({
+          op: "set",
+          addr: { sheet: SHEET, row, col },
+          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+        });
+      }
+    }
+    this.formulaDenseRows = 0;
+    this.applyPatches(patches);
+  }
+
+  installTextHeavy(rowCount: number): void {
+    this.textHeavyRows = Math.min(rowCount, this.initialRowCount - 1);
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.textHeavyRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        patches.push({
+          op: "set",
+          addr: { sheet: SHEET, row, col },
+          value: { kind: "literal", value: `diagnostic-long-${row}-${col}-${LONG_TEXT_SUFFIX}` },
+        });
+      }
+    }
+    this.applyPatches(patches);
+  }
+
+  clearTextHeavy(): void {
+    const patches: DocumentOp[] = [];
+    for (let row = 1; row <= this.textHeavyRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        patches.push({
+          op: "set",
+          addr: { sheet: SHEET, row, col },
+          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+        });
+      }
+    }
+    this.textHeavyRows = 0;
+    this.applyPatches(patches);
+  }
+
+  measureUnresizedMillionRowGeometry(): GeometryObservation {
+    return measureUnresizedMillionRowGeometry();
+  }
+
   installMergeHeavy(): void {
     const count = Math.min(2_000, Math.floor(this.initialRowCount / 2));
     this.grid.store.applyTransaction({
@@ -292,6 +443,33 @@ class SheetwriteAdapter implements RenderBenchAdapter {
     return getMergeIndexResourceStatsForTest();
   }
 
+  setWindowReadDiagnosticMode(mode: WindowReadDiagnosticMode): void {
+    if (!this.windowTransferDiagnostic) {
+      throw new Error("window-transfer mode requires benchmark diagnostic configuration");
+    }
+    if (mode === "reuse-decoded-view-upper-bound" && !this.priorDecodedView) {
+      this.windowReadDiagnosticMode = "baseline";
+      this.grid.store.getVisibleWindow(
+        SHEET,
+        { start: 0, end: Math.min(32, this.initialRowCount) },
+        Array.from({ length: this.colCount }, (_, column) => column),
+      );
+    }
+    this.windowReadDiagnosticMode = mode;
+  }
+
+  resetWindowTransferCounters(): void {
+    this.windowTransferCountersState.logicalFrames = 0;
+    this.windowTransferCountersState.windowReadRequests = 0;
+    this.windowTransferCountersState.logicalWindowReads = 0;
+    this.windowTransferCountersState.copiedBytes = 0;
+    this.windowTransferCountersState.outputAllocationEvents = 0;
+  }
+
+  windowTransferCounters(): WindowTransferCounters {
+    return { ...this.windowTransferCountersState };
+  }
+
   destroy(): void {
     this.grid.destroy();
   }
@@ -304,8 +482,12 @@ class HandsontableAdapter implements RenderBenchAdapter {
   private hot!: HotInstance;
   private host!: HTMLElement;
   private readonly data: CellValue[][];
+  private readonly dataset: ColumnarDataset;
+  private formulaDenseRows = 0;
+  private textHeavyRows = 0;
 
   constructor(dataset: ColumnarDataset) {
+    this.dataset = dataset;
     this.initialRowCount = dataset.rowCount;
     this.data = toAoA(dataset);
   }
@@ -411,6 +593,7 @@ class HandsontableAdapter implements RenderBenchAdapter {
       maximumTop: Math.max(0, element.scrollHeight - element.clientHeight),
       maximumLeft: Math.max(0, element.scrollWidth - element.clientWidth),
       firstVisibleRow: Math.floor(element.scrollTop / HANDSONTABLE_ROW_HEIGHT),
+      devicePixelRatio: window.devicePixelRatio,
     };
   }
 
@@ -477,6 +660,50 @@ class HandsontableAdapter implements RenderBenchAdapter {
     return getNumberFormatResourceStatsForTest();
   }
 
+  installFormulaDense(): void {
+    this.formulaDenseRows = Math.min(FORMULA_DENSE_ROWS, this.initialRowCount - 1);
+    for (let row = 1; row <= this.formulaDenseRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.data[row]![col] = `=A${row + 1}+${col}`;
+      }
+    }
+    this.hot.render();
+  }
+
+  clearFormulaDense(): void {
+    for (let row = 1; row <= this.formulaDenseRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.data[row]![col] = datasetValueAt(this.dataset, row, col);
+      }
+    }
+    this.formulaDenseRows = 0;
+    this.hot.render();
+  }
+
+  installTextHeavy(rowCount: number): void {
+    this.textHeavyRows = Math.min(rowCount, this.initialRowCount - 1);
+    for (let row = 1; row <= this.textHeavyRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.data[row]![col] = `diagnostic-long-${row}-${col}-${LONG_TEXT_SUFFIX}`;
+      }
+    }
+    this.hot.render();
+  }
+
+  clearTextHeavy(): void {
+    for (let row = 1; row <= this.textHeavyRows; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.data[row]![col] = datasetValueAt(this.dataset, row, col);
+      }
+    }
+    this.textHeavyRows = 0;
+    this.hot.render();
+  }
+
+  measureUnresizedMillionRowGeometry(): GeometryObservation {
+    return measureUnresizedMillionRowGeometry();
+  }
+
   installMergeHeavy(): void {
     const count = Math.min(2_000, Math.floor(this.initialRowCount / 2));
     this.hot.updateSettings({
@@ -499,6 +726,24 @@ class HandsontableAdapter implements RenderBenchAdapter {
 
   mergeResources() {
     return getMergeIndexResourceStatsForTest();
+  }
+
+  setWindowReadDiagnosticMode(_mode: WindowReadDiagnosticMode): void {
+    throw new Error("window-transfer diagnostics support only sheetwrite");
+  }
+
+  resetWindowTransferCounters(): void {
+    throw new Error("window-transfer diagnostics support only sheetwrite");
+  }
+
+  windowTransferCounters(): WindowTransferCounters {
+    return {
+      logicalFrames: 0,
+      windowReadRequests: 0,
+      logicalWindowReads: 0,
+      copiedBytes: 0,
+      outputAllocationEvents: 0,
+    };
   }
 
   destroy(): void {
@@ -544,6 +789,7 @@ function teardownFailures(results: readonly ScenarioResult[], error: unknown): S
       rows: result.rows,
       scenarioId: result.scenarioId,
       group: result.group,
+      ...(result.dataValidity === undefined ? {} : { dataValidity: result.dataValidity }),
       status: "failed",
       stage: "teardown",
       errorClass: normalized.name || "Error",
@@ -579,7 +825,7 @@ async function run(configuration: PageConfiguration): Promise<void> {
 
   let adapter: RenderBenchAdapter =
     configuration.engine === "sheetwrite"
-      ? new SheetwriteAdapter(dataset)
+      ? new SheetwriteAdapter(dataset, configuration.windowTransferDiagnostic)
       : new HandsontableAdapter(dataset);
   window.__benchStage = "mount";
   setStatus(`mounting ${configuration.engine}`);
@@ -598,9 +844,9 @@ async function run(configuration: PageConfiguration): Promise<void> {
   window.__benchResults = output;
 
   const results: ScenarioResult[] = [];
-  for (const scenario of RENDER_SCENARIOS) {
-    setStatus(`running ${scenario.id}`);
-    const result = runRenderScenario(adapter, dataset, scenario.id, {
+  for (const scenarioId of configuration.scenarios) {
+    setStatus(`running ${scenarioId}`);
+    const result = runRenderScenario(adapter, dataset, scenarioId, {
       runId: configuration.runId,
       round: configuration.round,
       warmupSamples: configuration.warmupSamples,
@@ -620,7 +866,7 @@ async function run(configuration: PageConfiguration): Promise<void> {
       // rolled back). Rebuild the fixture so later scenarios validate against
       // the canonical document instead of cascading the wreckage into
       // spurious failures.
-      setStatus(`rebuilding ${configuration.engine} after ${scenario.id} failure`);
+      setStatus(`rebuilding ${configuration.engine} after ${scenarioId} failure`);
       try {
         adapter.destroy();
       } catch {
@@ -630,7 +876,7 @@ async function run(configuration: PageConfiguration): Promise<void> {
       host.replaceChildren();
       adapter =
         configuration.engine === "sheetwrite"
-          ? new SheetwriteAdapter(dataset)
+          ? new SheetwriteAdapter(dataset, configuration.windowTransferDiagnostic)
           : new HandsontableAdapter(dataset);
       adapter.mount(host);
       await settle();
@@ -665,8 +911,46 @@ function readConfiguration(params: URLSearchParams): PageConfiguration {
   const engine = params.get("engine") === "handsontable" ? "handsontable" : "sheetwrite";
   const runId = params.get("runId");
   if (!runId) throw new Error("render benchmark requires a runId");
+  const requestedScenarios =
+    params.get("scenarios")?.split(",") ?? RENDER_SCENARIOS.map((scenario) => scenario.id);
+  if (
+    requestedScenarios.length === 0 ||
+    new Set(requestedScenarios).size !== requestedScenarios.length
+  ) {
+    throw new Error("render benchmark scenarios must be non-empty and unique");
+  }
+  for (const scenarioId of requestedScenarios) {
+    if (!ALL_RENDER_SCENARIOS.some((scenario) => scenario.id === scenarioId)) {
+      throw new Error(`unknown render benchmark scenario: ${scenarioId}`);
+    }
+  }
+  const diagnostic = params.get("diagnostic");
+  if (diagnostic !== null && diagnostic !== "window-transfer") {
+    throw new Error("unknown render benchmark diagnostic configuration");
+  }
+  const windowTransferDiagnostic = diagnostic === "window-transfer";
+  const requestedWindowTransferScenarios = requestedScenarios.filter((scenario) =>
+    WINDOW_TRANSFER_SCENARIO_IDS.includes(
+      scenario as (typeof WINDOW_TRANSFER_SCENARIO_IDS)[number],
+    ),
+  );
+  if (
+    requestedWindowTransferScenarios.length > 0 &&
+    (!windowTransferDiagnostic ||
+      engine !== "sheetwrite" ||
+      requestedWindowTransferScenarios.length !== WINDOW_TRANSFER_SCENARIO_IDS.length ||
+      !WINDOW_TRANSFER_SCENARIO_IDS.every((scenario) => requestedScenarios.includes(scenario)))
+  ) {
+    throw new Error(
+      "window-transfer scenarios require the complete sheetwrite benchmark diagnostic pair",
+    );
+  }
+  if (windowTransferDiagnostic && requestedWindowTransferScenarios.length === 0) {
+    throw new Error("window-transfer diagnostic configuration requires its scenario pair");
+  }
   return {
     engine,
+    scenarios: requestedScenarios as ScenarioId[],
     rows: positiveInteger(params.get("rows"), 100_000),
     measuredSamples: positiveInteger(params.get("samples"), 3),
     warmupSamples: nonNegativeInteger(params.get("warmups"), 1),
@@ -676,6 +960,7 @@ function readConfiguration(params: URLSearchParams): PageConfiguration {
     ),
     runId,
     round: positiveInteger(params.get("round"), 1),
+    windowTransferDiagnostic,
   };
 }
 

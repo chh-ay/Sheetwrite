@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sheetwrite.dev/schemas/wasm-store-only-probe-v1.json",
+  "title": "Sheetwrite store-only compile probe",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "provenance",
+    "command",
+    "outcome",
+    "exitCode",
+    "stdoutSha256",
+    "stderrSha256",
+    "blockers"
+  ],
+  "properties": {
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "dirty", "timestamp"],
+      "properties": {
+        "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "dirty": { "const": false },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    },
+    "command": {
+      "const": [
+        "cargo",
+        "check",
+        "--target",
+        "wasm32-unknown-unknown",
+        "--no-default-features",
+        "--message-format=json"
+      ]
+    },
+    "outcome": { "enum": ["compiled", "blocked", "failed"] },
+    "exitCode": { "type": "integer", "minimum": 0 },
+    "stdoutSha256": { "$ref": "#/$defs/sha256" },
+    "stderrSha256": { "$ref": "#/$defs/sha256" },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "owner", "dependency", "reason"],
+        "properties": {
+          "id": { "enum": ["formula-entry-ast", "dependency-index"] },
+          "kind": { "const": "dependency-cycle" },
+          "owner": { "type": "string", "minLength": 1 },
+          "dependency": { "type": "string", "minLength": 1 },
+          "reason": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "outcome": { "const": "compiled" } } },
+      "then": { "properties": { "exitCode": { "const": 0 }, "blockers": { "maxItems": 0 } } }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "blocked" } } },
+      "then": {
+        "properties": {
+          "exitCode": { "minimum": 1 },
+          "blockers": {
+            "minItems": 2,
+            "maxItems": 2,
+            "allOf": [
+              { "contains": { "properties": { "id": { "const": "formula-entry-ast" } } } },
+              { "contains": { "properties": { "id": { "const": "dependency-index" } } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "outcome": { "const": "failed" } } },
+      "then": { "properties": { "exitCode": { "minimum": 1 }, "blockers": { "maxItems": 0 } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

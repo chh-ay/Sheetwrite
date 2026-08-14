@@ -5,6 +5,9 @@ import { join } from "node:path";
 import {
   analyzePublicApi,
   checkManifestBaseline,
+  findUnusedPublicExports,
+  type PublicApiBaseline,
+  type PublicApiManifest,
   publicApiDigest,
   readPublicApiBaseline,
   validateManifest,
@@ -79,6 +82,42 @@ async function fixture(
     await writeFile(path, content);
   }
   return root;
+}
+
+function baselineArtifact(manifest: PublicApiManifest): PublicApiBaseline {
+  return {
+    schemaVersion: 2,
+    manifestFormatVersion: manifest.formatVersion,
+    sha256: publicApiDigest(manifest),
+    intentionalExports: manifest.packages
+      .flatMap((pkg) =>
+        pkg.entryPoints
+          .filter((entry) => entry.kind === "typescript")
+          .map((entry) => ({
+            package: pkg.name,
+            entryPoint: entry.subpath,
+            exports: entry.exports.map((apiExport) => apiExport.name).sort(),
+          })),
+      )
+      .sort((left, right) =>
+        `${left.package}\0${left.entryPoint}`.localeCompare(
+          `${right.package}\0${right.entryPoint}`,
+        ),
+      ),
+  };
+}
+
+async function installBaseline(
+  root: string,
+  manifest: PublicApiManifest,
+): Promise<PublicApiBaseline> {
+  const baseline = baselineArtifact(manifest);
+  await mkdir(join(root, "scripts"), { recursive: true });
+  await writeFile(
+    join(root, "scripts/public-api-baseline.json"),
+    `${JSON.stringify(baseline, null, 2)}\n`,
+  );
+  return baseline;
 }
 
 afterEach(async () => {
@@ -319,12 +358,14 @@ export class LegacyFailure extends RangeError {}`,
     );
   });
 
-  it("writes and reads an explicit baseline artifact", async () => {
+  it("writes and reads an explicit baseline artifact without changing reviewed intent", async () => {
     const root = await fixture();
     const { manifest } = await analyzePublicApi(root);
+    const initial = await installBaseline(root, manifest);
     const written = await writePublicApiBaseline(root, manifest);
 
     expect(written.sha256).toBe(publicApiDigest(manifest));
+    expect(written.intentionalExports).toEqual(initial.intentionalExports);
     expect(await readPublicApiBaseline(root)).toEqual(written);
     expect(
       JSON.parse(await readFile(join(root, "scripts/public-api-baseline.json"), "utf8")),
@@ -336,10 +377,74 @@ export class LegacyFailure extends RangeError {}`,
     await mkdir(join(root, "scripts"), { recursive: true });
     await writeFile(
       join(root, "scripts/public-api-baseline.json"),
-      JSON.stringify({ schemaVersion: 1, manifestFormatVersion: 2, sha256: "not-a-digest" }),
+      JSON.stringify({
+        schemaVersion: 2,
+        manifestFormatVersion: 2,
+        sha256: "not-a-digest",
+        intentionalExports: [],
+      }),
     );
     await expect(readPublicApiBaseline(root)).rejects.toThrow(
       "Invalid public API baseline artifact",
+    );
+  });
+
+  it("rejects an unreachable export outside the reviewed public contract", async () => {
+    const root = await fixture();
+    const initial = await analyzePublicApi(root);
+    const baseline = await installBaseline(root, initial.manifest);
+    await writeFile(
+      join(root, "packages/core/index.d.ts"),
+      `${canonicalDeclarations}\n/** Accidental fixture export. */\nexport const Unreachable = true;\n`,
+    );
+    const changed = await analyzePublicApi(root);
+    const refreshed = await writePublicApiBaseline(root, changed.manifest);
+
+    expect(refreshed.intentionalExports).toEqual(baseline.intentionalExports);
+
+    expect(await findUnusedPublicExports(root, changed.manifest, refreshed)).toContainEqual(
+      expect.objectContaining({
+        code: "unused-export",
+        package: "@sheetwrite/core",
+        entryPoint: ".",
+        symbol: "Unreachable",
+      }),
+    );
+  });
+
+  it("accepts reviewed exports and only referenced members of a workspace namespace", async () => {
+    const root = await fixture();
+    const initial = await analyzePublicApi(root);
+    const baseline = baselineArtifact(initial.manifest);
+    expect(await findUnusedPublicExports(root, initial.manifest, baseline)).toEqual([]);
+
+    await writeFile(
+      join(root, "packages/core/index.d.ts"),
+      `${canonicalDeclarations}
+/** Consumed fixture export. */
+export const Consumed = true;
+/** Unreachable fixture export. */
+export const StillUnreachable = true;
+`,
+    );
+    const consumerRoot = join(root, "packages/consumer");
+    await mkdir(consumerRoot, { recursive: true });
+    await writeFile(
+      join(consumerRoot, "package.json"),
+      JSON.stringify({ name: "@fixture/consumer", private: true }),
+    );
+    await writeFile(
+      join(consumerRoot, "index.ts"),
+      'import * as Core from "@sheetwrite/core";\nexport const observed = Core.Consumed;\n',
+    );
+    const changed = await analyzePublicApi(root);
+
+    const issues = await findUnusedPublicExports(root, changed.manifest, baseline);
+    expect(issues).not.toContainEqual(
+      expect.objectContaining({ code: "unused-export", symbol: "Consumed" }),
+    );
+    expect(issues).toContainEqual(
+      expect.objectContaining({ code: "unused-export", symbol: "StillUnreachable" }),
     );
   });
 

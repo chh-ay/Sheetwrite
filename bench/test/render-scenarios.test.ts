@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test";
 import { makeColumnar, toAoA } from "../src/dataset.js";
 import {
+  DIAGNOSTIC_RENDER_SCENARIOS,
+  WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
+  WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
+} from "../src/render-protocol.js";
+import {
   type CellSelection,
+  measureUnresizedMillionRowGeometry,
   type RenderBenchAdapter,
   runRenderScenario,
   type ScrollObservation,
@@ -18,6 +24,7 @@ class FakeAdapter implements RenderBenchAdapter {
   readonly initialRowCount: number;
   readonly colCount = 5;
   readonly values: unknown[][];
+  private readonly originalValues: unknown[][];
   corruptNavigation = false;
   private mounted = true;
   private selected: CellSelection | null = null;
@@ -25,11 +32,20 @@ class FakeAdapter implements RenderBenchAdapter {
   private top = 0;
   private left = 0;
   private readonly evidence: FakeEvidence;
+  private windowReadMode: "baseline" | "reuse-decoded-view-upper-bound" = "baseline";
+  private transferCounters = {
+    logicalFrames: 0,
+    windowReadRequests: 0,
+    logicalWindowReads: 0,
+    copiedBytes: 0,
+    outputAllocationEvents: 0,
+  };
 
   constructor(rows = 200, evidence: FakeEvidence = {}) {
     const dataset = makeColumnar(rows);
     this.initialRowCount = rows;
-    this.values = toAoA(dataset);
+    this.originalValues = toAoA(dataset);
+    this.values = this.originalValues.map((row) => [...row]);
     this.evidence = evidence;
   }
 
@@ -71,8 +87,14 @@ class FakeAdapter implements RenderBenchAdapter {
   scrollBy(axis: "top" | "left", pixels: number): void {
     if (axis === "top") this.top = Math.min(1_000, this.top + pixels);
     else this.left = Math.min(500, this.left + pixels);
+    this.transferCounters.logicalFrames++;
+    this.transferCounters.windowReadRequests++;
+    if (this.windowReadMode === "baseline") {
+      this.transferCounters.logicalWindowReads++;
+      this.transferCounters.copiedBytes += 1_024;
+      this.transferCounters.outputAllocationEvents += 7;
+    }
   }
-
   scrollObservation(): ScrollObservation {
     return {
       top: this.top,
@@ -80,6 +102,7 @@ class FakeAdapter implements RenderBenchAdapter {
       maximumTop: 1_000,
       maximumLeft: 500,
       firstVisibleRow: Math.floor(this.top / 25),
+      devicePixelRatio: 1.25,
     };
   }
 
@@ -138,6 +161,50 @@ class FakeAdapter implements RenderBenchAdapter {
     };
   }
 
+  installFormulaDense(): void {
+    for (let row = 1; row <= Math.min(64, this.initialRowCount - 1); row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.values[row]![col] = Number(this.values[row]![0]) + col;
+      }
+    }
+  }
+
+  clearFormulaDense(): void {
+    for (let row = 1; row <= Math.min(64, this.initialRowCount - 1); row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.values[row]![col] = this.originalValues[row]![col];
+      }
+    }
+  }
+
+  installTextHeavy(rowCount: number): void {
+    for (let row = 1; row <= Math.min(rowCount, this.initialRowCount - 1); row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.values[row]![col] = `diagnostic-long-${row}-${col}`;
+      }
+    }
+  }
+
+  clearTextHeavy(): void {
+    for (let row = 1; row < this.initialRowCount; row++) {
+      for (let col = 1; col < this.colCount; col++) {
+        this.values[row]![col] = this.originalValues[row]![col];
+      }
+    }
+  }
+
+  measureUnresizedMillionRowGeometry() {
+    return {
+      count: 1_000_000,
+      backingStoreBytes: 0,
+      totalHeight: 28_000_000,
+      middleRow: 500_000,
+      middleTop: 14_000_000,
+      lastRow: 999_999,
+      lastTop: 27_999_972,
+    };
+  }
+
   installMergeHeavy(): void {}
 
   clearMergeHeavy(): void {}
@@ -149,6 +216,22 @@ class FakeAdapter implements RenderBenchAdapter {
       indexConstructions: this.evidence.indexConstructions ?? 1,
       candidatesExamined: this.evidence.candidatesExamined ?? 4,
     };
+  }
+
+  setWindowReadDiagnosticMode(mode: "baseline" | "reuse-decoded-view-upper-bound"): void {
+    this.windowReadMode = mode;
+  }
+
+  resetWindowTransferCounters(): void {
+    this.transferCounters.logicalFrames = 0;
+    this.transferCounters.windowReadRequests = 0;
+    this.transferCounters.logicalWindowReads = 0;
+    this.transferCounters.copiedBytes = 0;
+    this.transferCounters.outputAllocationEvents = 0;
+  }
+
+  windowTransferCounters() {
+    return { ...this.transferCounters };
   }
 
   destroy(): void {
@@ -219,6 +302,63 @@ describe("scenario correctness checkpoints", () => {
         passed: true,
       }),
     );
+  });
+
+  test("measures real million-row uniform OffsetIndex geometry", () => {
+    expect(measureUnresizedMillionRowGeometry()).toEqual({
+      count: 1_000_000,
+      backingStoreBytes: 0,
+      totalHeight: 28_000_000,
+      middleRow: 500_000,
+      middleTop: 14_000_000,
+      lastRow: 999_999,
+      lastTop: 27_999_972,
+    });
+  });
+
+  test("records each measured-only diagnostic scenario without promoting it to the gate", () => {
+    for (const scenario of DIAGNOSTIC_RENDER_SCENARIOS) {
+      const result = runRenderScenario(new FakeAdapter(), dataset, scenario.id, options);
+      expect(result.status).toBe("success");
+      if (result.status !== "success") throw new Error(result.message);
+      expect(result.validation.every((observation) => observation.passed)).toBe(true);
+    }
+  });
+  test("separates exact transfer counters from the pixel-data-invalid upper bound", () => {
+    const baseline = runRenderScenario(
+      new FakeAdapter(),
+      dataset,
+      WINDOW_TRANSFER_BASELINE_SCENARIO_ID,
+      options,
+    );
+    const upperBound = runRenderScenario(
+      new FakeAdapter(),
+      dataset,
+      WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID,
+      options,
+    );
+    expect(baseline.status).toBe("success");
+    expect(upperBound.status).toBe("success");
+    if (baseline.status !== "success" || upperBound.status !== "success") {
+      throw new Error("expected successful transfer diagnostic pair");
+    }
+    expect(baseline.dataValidity).toBe("product-valid");
+    expect(baseline.windowTransfer).toMatchObject({
+      copiedBytesPerLogicalFrame: 1_024,
+      outputAllocationEventsPerLogicalFrame: 7,
+      copiedBytesPerLogicalRead: 1_024,
+      outputAllocationEventsPerLogicalRead: 7,
+    });
+    expect(upperBound.dataValidity).toBe("pixel-data-invalid");
+    expect(upperBound.windowTransfer).toMatchObject({
+      logicalWindowReads: 0,
+      copiedBytes: 0,
+      outputAllocationEvents: 0,
+      copiedBytesPerLogicalRead: null,
+      outputAllocationEventsPerLogicalRead: null,
+    });
+    expect(upperBound.windowTransfer?.logicalFrames).toBe(upperBound.operationCount);
+    expect(upperBound.windowTransfer?.windowReadRequests).toBe(upperBound.operationCount);
   });
 
   test("rejects corrupt formatter and merge-index evidence", () => {

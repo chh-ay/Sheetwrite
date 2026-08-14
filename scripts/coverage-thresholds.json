@@ -636,10 +636,12 @@
         "packages/core/src/store.ts",
         "packages/core/src/store/data-engine.ts",
         "packages/core/src/store/mutation-policy.ts",
+        "packages/core/src/store/paged-dirty-preflight.ts",
         "packages/core/src/store/ranges.ts",
         "packages/core/src/store/snapshot-codec.ts",
         "packages/core/src/store/view-state.ts",
-        "packages/core/src/store/window-reader.ts"
+        "packages/core/src/store/window-reader.ts",
+        "packages/core/src/store/wire-tags.ts"
       ],
       "language": "typescript",
       "tier": "B",
